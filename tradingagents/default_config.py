@@ -156,4 +156,27 @@ DEFAULT_CONFIG = _apply_env_overrides({
         ".SZ":  "399001.SZ",   # Shenzhen (SZSE Component)
         "":     "SPY",         # default for US-listed tickers (no suffix)
     },
+    # ISIN-to-ticker mapping for the Sentiment Analyst.
+    #
+    # Social-media platforms (StockTwits, Reddit) index posts by exchange
+    # ticker / cashtag (e.g. $AAPL), not by ISIN. When the instrument under
+    # analysis is a fund identified by an ISIN, searching for the raw ISIN
+    # string returns no results. Populate this dict to map each fund ISIN to
+    # one or more representative stock tickers that people actually discuss on
+    # social platforms (e.g. the fund's exchange-listed ticker symbols or its
+    # largest constituent holdings).
+    #
+    # Format:
+    #   "<ISIN>": ["<TICKER_1>", "<TICKER_2>", ...]
+    #
+    # Example:
+    #   "IE00B4L5Y983": ["IWDA.L", "SWRD.L"],  # iShares Core MSCI World ETF
+    #   "IE00B3RBWM25": ["VWRL.L"],             # Vanguard FTSE All-World ETF
+    #
+    # If an ISIN is not listed here, a warning is logged and the ISIN is used
+    # as-is for the search (which will typically return empty results from all
+    # three sentiment sources).
+    "isin_ticker_map": {
+        "GB00B80QG615": ["SPY", "VOO"],
+    },
 })

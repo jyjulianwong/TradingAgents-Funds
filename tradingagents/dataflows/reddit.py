@@ -191,7 +191,7 @@ def fetch_reddit_posts(
     subreddits: Iterable[str] = DEFAULT_SUBREDDITS,
     limit_per_sub: int = 5,
     timeout: float = 10.0,
-    inter_request_delay: float = 1.0,
+    inter_request_delay: float = 3.0,  # NOTE: Increased to adapt for ISIN-identified funds that contain multiple tickers.
 ) -> str:
     """Fetch recent Reddit posts mentioning ``ticker`` across finance
     subreddits and return them as a formatted plaintext block.

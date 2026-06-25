@@ -1,9 +1,11 @@
 name: CI
 
-on:
-  push:
-    branches: [main]
-  pull_request:
+# Disabled: change back to the original triggers to re-enable CI.
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+on: workflow_dispatch
 
 concurrency:
   group: ci-${{ github.ref }}

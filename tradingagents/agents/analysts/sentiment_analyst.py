@@ -24,6 +24,8 @@ See: https://github.com/TauricResearch/TradingAgents/issues/557
 See: https://github.com/TauricResearch/TradingAgents/issues/796
 """
 
+import logging
+import re
 from datetime import datetime, timedelta
 
 from langchain_core.messages import AIMessage
@@ -41,6 +43,78 @@ from tradingagents.agents.utils.structured import (
 )
 from tradingagents.dataflows.reddit import fetch_reddit_posts
 from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
+
+
+logger = logging.getLogger(__name__)
+
+# Matches the standard 12-character ISIN format: 2-letter country code,
+# 9 alphanumeric characters, 1 numeric check digit.
+_ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+
+
+def _resolve_sentiment_tickers(ticker: str) -> list[str]:
+    """Return the list of tickers to use for sentiment data fetching.
+
+    For ordinary stock/crypto tickers this is simply ``[ticker]``. When the
+    input looks like an ISIN (fund identifier), the function checks
+    ``DEFAULT_CONFIG['isin_ticker_map']`` for a user-defined mapping:
+
+    - If a mapping exists, the mapped tickers are returned so that
+      StockTwits / Reddit / news fetches target symbols people actually
+      discuss on social platforms.
+    - If no mapping exists, a ``WARNING`` is logged and ``[ticker]`` is
+      returned unchanged (the ISIN will typically yield empty results from
+      all three sentiment sources).
+    """
+    if not _ISIN_RE.match(ticker.upper()):
+        return [ticker]
+
+    from tradingagents.dataflows.config import get_config
+
+    isin_map = get_config().get("isin_ticker_map", {})
+    mapped = isin_map.get(ticker.upper()) or isin_map.get(ticker)
+    if mapped:
+        return list(mapped)
+
+    logger.warning(
+        "Sentiment Analyst: %r looks like an ISIN but has no entry in "
+        "DEFAULT_CONFIG['isin_ticker_map']. Searching as-is — results will "
+        "likely be empty. Add a mapping to fix this, e.g. "
+        '"%s": ["TICKER1", "TICKER2"].',
+        ticker,
+        ticker.upper(),
+    )
+    return [ticker]
+
+
+def _fetch_multi_ticker_blocks(
+    isin: str,
+    mapped_tickers: list[str],
+    start_date: str,
+    end_date: str,
+) -> tuple[str, str, str]:
+    """Fetch and label sentiment data blocks for multiple mapped tickers.
+
+    Each source block (news, StockTwits, Reddit) is prefixed with a header
+    that identifies the ticker and its parent ISIN, then all blocks for
+    that source are concatenated so the LLM receives one unified string
+    per source.
+    """
+    news_parts: list[str] = []
+    stocktwits_parts: list[str] = []
+    reddit_parts: list[str] = []
+
+    for t in mapped_tickers:
+        header = f"### {t} (mapped from fund ISIN {isin})"
+        news_parts.append(f"{header}\n{get_news.func(t, start_date, end_date)}")
+        stocktwits_parts.append(f"{header}\n{fetch_stocktwits_messages(t, limit=30)}")
+        reddit_parts.append(f"{header}\n{fetch_reddit_posts(t)}")
+
+    return (
+        "\n\n".join(news_parts),
+        "\n\n".join(stocktwits_parts),
+        "\n\n".join(reddit_parts),
+    )
 
 
 def _seven_days_back(trade_date: str) -> str:
@@ -63,12 +137,27 @@ def create_sentiment_analyst(llm):
         start_date = _seven_days_back(end_date)
         instrument_context = get_instrument_context_from_state(state)
 
+        # Resolve which ticker(s) to query for sentiment data. For ordinary
+        # tickers this is a no-op ([ticker]). For fund ISINs it returns the
+        # user-configured mapped tickers from isin_ticker_map, or falls back
+        # to [ticker] with a warning when no mapping is found.
+        sentiment_tickers = _resolve_sentiment_tickers(ticker)
+        is_mapped = sentiment_tickers != [ticker]
+
         # Pre-fetch all three sources. Each fetcher degrades gracefully and
         # returns a string (no exceptions surface from here), so the LLM
         # always sees something — either real data or a clear placeholder.
-        news_block = get_news.func(ticker, start_date, end_date)
-        stocktwits_block = fetch_stocktwits_messages(ticker, limit=30)
-        reddit_block = fetch_reddit_posts(ticker)
+        if is_mapped:
+            news_block, stocktwits_block, reddit_block = _fetch_multi_ticker_blocks(
+                isin=ticker,
+                mapped_tickers=sentiment_tickers,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            news_block = get_news.func(ticker, start_date, end_date)
+            stocktwits_block = fetch_stocktwits_messages(ticker, limit=30)
+            reddit_block = fetch_reddit_posts(ticker)
 
         system_message = _build_system_message(
             ticker=ticker,
@@ -77,6 +166,7 @@ def create_sentiment_analyst(llm):
             news_block=news_block,
             stocktwits_block=stocktwits_block,
             reddit_block=reddit_block,
+            mapped_tickers=sentiment_tickers if is_mapped else None,
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -126,9 +216,28 @@ def _build_system_message(
     news_block: str,
     stocktwits_block: str,
     reddit_block: str,
+    mapped_tickers: list[str] | None = None,
 ) -> str:
-    """Assemble the sentiment-analyst system message with structured data blocks."""
-    return f"""You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {ticker} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
+    """Assemble the sentiment-analyst system message with structured data blocks.
+
+    When ``mapped_tickers`` is provided the subject is a fund identified by
+    ``ticker`` (an ISIN). The data blocks contain labelled sections for each
+    mapped ticker and the intro paragraph tells the LLM to interpret them in
+    aggregate as a proxy for the fund's sentiment.
+    """
+    if mapped_tickers:
+        subject_description = (
+            f"{ticker} (a fund). Because funds are identified by ISIN on "
+            f"exchanges but discussed on social media by their exchange-listed "
+            f"ticker symbols or constituent holdings, sentiment data has been "
+            f"collected for the following mapped tickers: "
+            f"{', '.join(mapped_tickers)}. Each section in the data blocks "
+            f"below is labelled by ticker. Synthesise all sections into a "
+            f"single, unified sentiment picture for the fund as a whole."
+        )
+    else:
+        subject_description = ticker
+    return f"""You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {subject_description} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
 
 ## Data sources (pre-fetched, in this prompt)
 
