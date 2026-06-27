@@ -71,7 +71,10 @@ export class CharacterManager {
   }
 
   update(delta) {
-    for (const c of Object.values(this.chars)) c.update(delta);
+    for (const c of Object.values(this.chars)) {
+      if (!c.group.visible) continue;
+      c.update(delta);
+    }
   }
 }
 
@@ -108,6 +111,7 @@ class Character {
     this._walkTarget   = null;
     this._walkCallback = null;
     this._walkSpeed    = 3.5;  // units/second
+    this._dir          = new THREE.Vector3(); // reused each frame to avoid GC pressure
   }
 
   // ── Geometry builders ──────────────────────────────────────────────────────
@@ -223,7 +227,7 @@ class Character {
       s.position.set(x, y, z);
       this.thinkCloud.add(s);
 
-      const halo = new THREE.Mesh(new THREE.SphereGeometry(r * 1.9, 10, 7), glowMat.clone());
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(r * 1.9, 10, 7), glowMat);
       halo.position.set(x, y, z);
       this.thinkCloud.add(halo);
     }
@@ -287,7 +291,7 @@ class Character {
     const target = this._walkTarget;
     if (!target) { this.state = 'idle'; return; }
 
-    const dir = new THREE.Vector3(
+    const dir = this._dir.set(
       target.x - this.group.position.x,
       0,
       target.z - this.group.position.z,

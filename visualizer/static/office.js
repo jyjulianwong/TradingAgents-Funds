@@ -28,14 +28,17 @@ const WALL_H  = 10;
 
 export function buildOffice(scene, agentConfigs) {
   const state = {
-    ambientLight:  null,
-    sunLight:      null,
-    pointLights:   [],
-    lightPanels:   [],
-    monitorScreens:[],
-    tickerCtx:     null,
-    tickerCanvas:  null,
-    tickerTexture: null,
+    ambientLight:     null,
+    sunLight:         null,
+    pointLights:      [],
+    lightPanels:      [],
+    lightPanelMat:    null,
+    monitorScreens:   [],
+    monitorScreenMat: null,
+    tickerCtx:        null,
+    tickerCanvas:     null,
+    tickerTexture:    null,
+    tickerLastOffset: -1,
   };
 
   _buildFloor(scene);
@@ -56,32 +59,27 @@ export function buildOffice(scene, agentConfigs) {
 export function setOfficeActive(state, active) {
   if (active) {
     state.ambientLight.color.set(0x8899cc);
-    state.ambientLight.intensity = 0.65;
-    state.sunLight.intensity     = 0.55;
-    state.lightPanels.forEach(p => {
-      p.material.emissive.set(0xfff8e8);
-      p.material.emissiveIntensity = 1.0;
-    });
-    state.pointLights.forEach(pl => { pl.intensity = 1.4; });
-    state.monitorScreens.forEach(m => {
-      m.material.emissive.set(0x002800);
-      m.material.emissiveIntensity = 1.0;
-    });
+    state.ambientLight.intensity = 0.85;
+    state.sunLight.intensity     = 0.75;
+    state.lightPanelMat.emissive.set(0xfff8e8);
+    state.lightPanelMat.emissiveIntensity = 1.0;
+    state.pointLights.forEach(pl => { pl.intensity = 3.2; });
+    state.monitorScreenMat.emissive.set(0x002800);
+    state.monitorScreenMat.emissiveIntensity = 1.0;
   } else {
     state.ambientLight.color.set(0x7788aa);
-    state.ambientLight.intensity = 0.45;
+    state.ambientLight.intensity = 0.3;
     state.sunLight.intensity     = 0;
-    state.lightPanels.forEach(p => {
-      p.material.emissiveIntensity = 0;
-    });
+    state.lightPanelMat.emissiveIntensity = 0;
     state.pointLights.forEach(pl => { pl.intensity = 0; });
-    state.monitorScreens.forEach(m => {
-      m.material.emissiveIntensity = 0;
-    });
+    state.monitorScreenMat.emissiveIntensity = 0;
   }
 }
 
 export function drawTickerScrolling(state, ticker, offset) {
+  if (Math.floor(offset) === Math.floor(state.tickerLastOffset)) return false;
+  state.tickerLastOffset = offset;
+
   const { tickerCtx: ctx, tickerCanvas: cv } = state;
   ctx.fillStyle = '#010d01';
   ctx.fillRect(0, 0, cv.width, cv.height);
@@ -97,6 +95,7 @@ export function drawTickerScrolling(state, ticker, offset) {
     ctx.fillText(unit, x, cv.height / 2);
   }
   state.tickerTexture.needsUpdate = true;
+  return true;
 }
 
 export function drawTickerSignal(state, rawSignal) {
@@ -222,22 +221,18 @@ function _buildCeiling(scene, state) {
 
   // LED strip panels across the main trading floor — 5×7 grid for the larger floor
   const panelGeo = new THREE.BoxGeometry(3.6, 0.025, 0.1);
-  const positions = [];
+  state.lightPanelMat = new THREE.MeshLambertMaterial({
+    color: 0xfff8e0,
+    emissive: new THREE.Color(0xfff8e0),
+    emissiveIntensity: 0,
+  });
   for (let xi = -2; xi <= 2; xi++) {
     for (let zi = -3; zi <= 3; zi++) {
-      positions.push([xi * 7, zi * 4]);
+      const panel = new THREE.Mesh(panelGeo, state.lightPanelMat);
+      panel.position.set(xi * 7, WALL_H - 0.03, zi * 4);
+      scene.add(panel);
+      state.lightPanels.push(panel);
     }
-  }
-  for (const [x, z] of positions) {
-    const mat = new THREE.MeshLambertMaterial({
-      color: 0xfff8e0,
-      emissive: new THREE.Color(0xfff8e0),
-      emissiveIntensity: 0,
-    });
-    const panel = new THREE.Mesh(panelGeo, mat);
-    panel.position.set(x, WALL_H - 0.03, z);
-    scene.add(panel);
-    state.lightPanels.push(panel);
   }
 }
 
@@ -275,7 +270,7 @@ function _buildTickerDisplay(scene, state) {
 /**
  * Builds a dimensional "TradingAgents" nameplate on the back wall, centred
  * above the LED ticker display.  The sign uses a BoxGeometry with cream-coloured
- * sides so it reads as a solid 3-D mounted plate; the Cormorant font (loaded via
+ * sides so it reads as a solid 3-D mounted plate; the Cormorant SC font (loaded via
  * Google Fonts in index.html) is drawn onto a CanvasTexture once the font is
  * available and composited onto the front face.
  */
@@ -326,7 +321,7 @@ function _buildCompanySign(scene) {
     ctx.fillRect(0, 0, CV_W, CV_H);
 
     ctx.fillStyle    = '#000000';
-    ctx.font         = '400 48px "Cormorant", serif';
+    ctx.font         = '400 48px "Cormorant SC", serif';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('TradingAgents', CV_W / 2, CV_H / 2);
@@ -334,10 +329,10 @@ function _buildCompanySign(scene) {
     texture.needsUpdate = true;
   };
 
-  // Draw once the Cormorant font is confirmed available; fall back immediately
+  // Draw once the Cormorant SC font is confirmed available; fall back immediately
   // if the font API is absent (older browsers will use the first serif found).
   if (typeof document !== 'undefined' && document.fonts) {
-    document.fonts.load('400 48px "Cormorant"').then(_draw).catch(_draw);
+    document.fonts.load('400 48px "Cormorant SC"').then(_draw).catch(_draw);
   } else {
     _draw();
   }
@@ -512,9 +507,9 @@ function _buildMeetingRoom(scene) {
   // Cool blue-tinted glass — clearly interior partitions, distinct from the
   // darker external walls.
   const glassMat = new THREE.MeshLambertMaterial({
-    color: 0xaaccee,
+    color: 0xbbddff,
     transparent: true,
-    opacity: 0.15,
+    opacity: 0.08,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -842,11 +837,13 @@ function _buildSingleDesk(scene, x, z, state, premium = false) {
     deskGroup.add(base);
 
     for (const row of monRows) {
-      const screenMat = new THREE.MeshLambertMaterial({
-        color: 0x001100,
-        emissive: new THREE.Color(0x001100),
-        emissiveIntensity: 0,
-      });
+      if (!state.monitorScreenMat) {
+        state.monitorScreenMat = new THREE.MeshLambertMaterial({
+          color: 0x001100,
+          emissive: new THREE.Color(0x001100),
+          emissiveIntensity: 0,
+        });
+      }
 
       const mon = new THREE.Mesh(monGeo, monFrmMat);
       mon.position.set(col.x, deskTop + row.dy, monZ);
@@ -855,7 +852,7 @@ function _buildSingleDesk(scene, x, z, state, premium = false) {
       deskGroup.add(mon);
 
       const screenPlane = new THREE.PlaneGeometry(monW - 0.06, monH - 0.06);
-      const screen = new THREE.Mesh(screenPlane, screenMat);
+      const screen = new THREE.Mesh(screenPlane, state.monitorScreenMat);
       screen.position.set(0, 0, 0.027);
       mon.add(screen);
       state.monitorScreens.push(screen);
@@ -888,12 +885,6 @@ function _buildNPCTradingDesks(scene, state) {
   for (let i = 0; i < NPC_X.length; i++) {
     _buildSingleDesk(scene, NPC_X[i], 3, state);
     _buildStaticNPC(scene, NPC_X[i], 3, NPC_COLORS[i]);
-
-    // Point light above each NPC desk, toggled with the rest
-    const pl = new THREE.PointLight(0xfff0d0, 0, 13, 1.8);
-    pl.position.set(NPC_X[i], WALL_H - 1.5, 3);
-    scene.add(pl);
-    state.pointLights.push(pl);
   }
 }
 
@@ -1038,23 +1029,10 @@ function _buildPMOffice(scene, state) {
   // Extra ceiling light panels inside PM office
   const pmPanelGeo = new THREE.BoxGeometry(3.6, 0.025, 0.1);
   for (const [px, pz] of [[-2.5, 12.5], [0, 12.5], [2.5, 12.5]]) {
-    const mat = new THREE.MeshLambertMaterial({
-      color: 0xfff8e0,
-      emissive: new THREE.Color(0xfff8e0),
-      emissiveIntensity: 0,
-    });
-    const panel = new THREE.Mesh(pmPanelGeo, mat);
+    const panel = new THREE.Mesh(pmPanelGeo, state.lightPanelMat);
     panel.position.set(px, WALL_H - 0.03, pz);
     scene.add(panel);
     state.lightPanels.push(panel);
-  }
-
-  // Point lights inside PM office
-  for (const [px, pz] of [[-2.5, 12.5], [0, 12.5], [2.5, 12.5]]) {
-    const pl = new THREE.PointLight(0xfff0d0, 0, 13, 1.8);
-    pl.position.set(px, WALL_H - 1.5, pz);
-    scene.add(pl);
-    state.pointLights.push(pl);
   }
 }
 
@@ -1070,11 +1048,17 @@ function _buildLighting(scene, agentConfigs, state) {
   scene.add(sun);
   state.sunLight = sun;
 
-  // One point light above every agent position (including seated meeting-room
-  // characters — their desk position sits inside the meeting room).
-  for (const cfg of agentConfigs) {
-    const pl = new THREE.PointLight(0xfff0d0, 0, 13, 1.8);
-    pl.position.set(cfg.desk.x, WALL_H - 1.5, cfg.desk.z);
+  // Four zone lights replace the previous per-desk lights (was 19 total).
+  // Each covers one area of the floor; higher intensity compensates for fewer sources.
+  const zones = [
+    [  0, -9  ],  // analyst row
+    [  0,  0  ],  // meeting room + trading desks
+    [  0,  7  ],  // risk management row
+    [  0,  12 ],  // PM corner office
+  ];
+  for (const [zx, zz] of zones) {
+    const pl = new THREE.PointLight(0xfff0d0, 0, 18, 1.6);
+    pl.position.set(zx, WALL_H - 1.5, zz);
     scene.add(pl);
     state.pointLights.push(pl);
   }

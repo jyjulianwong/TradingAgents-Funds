@@ -46,6 +46,7 @@ def _open_run_log(ticker: str = "", date: str = "") -> None:
     global _log_file
     if _log_file is not None:
         try:
+            _log_file.flush()
             _log_file.close()
         except OSError:
             pass
@@ -66,7 +67,6 @@ def _append_log(event: dict[str, Any]) -> None:
             "event": event,
         }
         _log_file.write(json.dumps(entry) + "\n")
-        _log_file.flush()
     except OSError:
         pass
 

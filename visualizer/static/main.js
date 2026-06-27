@@ -35,8 +35,8 @@ document.getElementById('label-layer').replaceWith(labelLayer);
 // ─── Scene ───────────────────────────────────────────────────────────────────
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf0f0ee);
-scene.fog = new THREE.Fog(0xf0f0ee, 45, 95);
+scene.background = new THREE.Color(0x12121e);
+scene.fog = new THREE.Fog(0x12121e, 45, 95);
 
 // ─── Camera ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +58,7 @@ controls.mouseButtons    = {
   MIDDLE: THREE.MOUSE.DOLLY,
   RIGHT: THREE.MOUSE.PAN,
 };
+controls.addEventListener('change', () => { needsRender = true; });
 
 // ─── Build Office & Characters ────────────────────────────────────────────────
 
@@ -71,10 +72,11 @@ charManager.showAll();
 
 // ─── Application State ────────────────────────────────────────────────────────
 
-let isActive    = false;
-let isComplete  = false;
+let isActive     = false;
+let isComplete   = false;
 let tickerSymbol = '';
 let tickerOffset = 0;
+let needsRender  = true; // dirty flag: render only when scene has changed
 
 // ─── Dialog box ───────────────────────────────────────────────────────────────
 
@@ -101,6 +103,7 @@ const eventHandler = new EventHandler(officeState, charManager, {
     setStatus('Out of hours — waiting for analysis to start');
     setTicker('');
     dialogBox.reset();
+    needsRender = true;
   },
   onStart(ticker) {
     tickerSymbol = ticker;
@@ -112,6 +115,7 @@ const eventHandler = new EventHandler(officeState, charManager, {
     setStatus(`Analysing ${ticker}…`);
     setTicker(ticker);
     dialogBox.reset();
+    needsRender = true;
   },
   onComplete(signal, ticker) {
     isComplete = true;
@@ -127,10 +131,11 @@ const eventHandler = new EventHandler(officeState, charManager, {
 
     setStatus(`Analysis complete — ${ticker}`);
     setTicker(`${display}  ·  ${ticker}`, colour);
+    needsRender = true;
   },
-  onAgentActive(agentName)          { dialogBox.onAgentActive(agentName); },
-  onAgentIdle(agentName)            { dialogBox.onAgentIdle(agentName); },
-  onAgentMessage(agentName, text)   { dialogBox.onAgentMessage(agentName, text); },
+  onAgentActive(agentName)          { dialogBox.onAgentActive(agentName); needsRender = true; },
+  onAgentIdle(agentName)            { dialogBox.onAgentIdle(agentName);   needsRender = true; },
+  onAgentMessage(agentName, text)   { dialogBox.onAgentMessage(agentName, text); needsRender = true; },
 });
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
@@ -145,6 +150,7 @@ function connectWS() {
   ws.onmessage = (e) => {
     try {
       eventHandler.handle(JSON.parse(e.data));
+      needsRender = true;
     } catch (_) { /* ignore malformed messages */ }
   };
 
@@ -165,14 +171,26 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
 
-  controls.update();
+  // controls.update() returns true while damping is still settling
+  if (controls.update()) needsRender = true;
+
+  // Characters in non-idle states (walking, thinking) drive continuous animation
+  for (const c of Object.values(charManager.chars)) {
+    if (c.group.visible && (c.state === 'walking' || (c.state === 'thinking' && c.thinkCloud.visible))) {
+      needsRender = true;
+      break;
+    }
+  }
   charManager.update(delta);
 
   // Scroll the ticker display while analysis is running
   if (isActive && !isComplete && tickerSymbol) {
     tickerOffset += delta * 85;
-    drawTickerScrolling(officeState, tickerSymbol, tickerOffset);
+    if (drawTickerScrolling(officeState, tickerSymbol, tickerOffset)) needsRender = true;
   }
+
+  if (!needsRender) return;
+  needsRender = false;
 
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
