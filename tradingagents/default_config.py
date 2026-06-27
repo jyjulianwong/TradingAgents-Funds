@@ -177,6 +177,26 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # as-is for the search (which will typically return empty results from all
     # three sentiment sources).
     "isin_ticker_map": {
-        "GB00B80QG615": ["SPY", "VOO"],
-    },
+        "GB00BJS8SF95": ["ISF.L"],  # Fidelity Index UK P Acc (FTSE All-Share proxy)
+        "GB00BJS8SH10": ["SPY"],  # Fidelity Index US P Acc (S&P 500)
+        "GB00B8HPRW47": ["TEL", "XYL", "ECL"],  # FP WHEB Sustainability Impact C Acc (top 3 holdings)
+        "GB00B80QG615": ["SPY"],  # HSBC American Index Acc C (S&P 500)
+        "GB00BN08ZN29": ["SLXX.L"],  # iShares Corporate Bond Index S Acc (iBoxx GBP Non-Gilts proxy)
+        "GB00BN091933": ["IWDP.L"],  # iShares Enviro & Low Carbon Tilt Real Estate S Acc (FTSE EPRA Nareit proxy)
+        "GB00BN08ZG51": ["EWJ"],  # iShares Japan Equity Index S Acc (FTSE Japan)
+        "GB00BN08ZQ59": ["EPP"],  # iShares Pacific ex Japan Equity Index S Acc
+        "GB00BG0QP042": ["EXU.L"],  # L&G European Index C Acc (FTSE World Europe ex UK)
+        "GB00BL6C2119": ["EEM"],  # L&G Future World ESG Tilted & Opt Emerging Markets C Acc
+        "GB00BMFXWS95": ["IWDA.L"],  # L&G Future World ESG Tilted & Opt Developed C Acc
+        "GB00BJLP1W53": ["IXN"],  # L&G Global Technology Index Trust C Acc (FTSE World Technology)
+        "GB00BK5HLJ16": ["IWDP.L"],  # abrdn Global REIT Tracker N Acc (FTSE EPRA Nareit Developed)
+        "GB00B784NS11": ["REGN", "VRTX", "AMGN"],  # AXA Framlington Biotech Z Acc (top 3 holdings)
+        "GB00B6WZJX05": ["LLY", "TMO", "AZN"],  # AXA Framlington Health Z Acc (top 3 holdings)
+        "GB00B3B9VD63": ["CTVA", "NTR", "MOS"],  # Barings Global Agriculture I Acc (top 3 holdings)
+        "GB00B6865B79": ["XOM", "SHEL", "WPM"],  # BlackRock Natural Resources D Acc (top 3 holdings)
+        "GB00B88MP089": ["XOM", "NEM", "SHEL"],  # JPMorgan Natural Resources C Acc (top 3 holdings)
+        "GB00BVLL5586": ["GOLD", "NEM", "AU"],  # Ninety One Global Gold B Inc (top 3 holdings)
+        "GB00B76V7Q08": ["JNJ", "LLY", "UNH"],  # Schroder Global Healthcare Z Acc (top 3 holdings)
+        "GB00B56FW078": ["XOM", "SHEL", "COP"]  # WS Guinness Global Energy I Acc (largest weights, proxy via sister strategy)
+    }
 })

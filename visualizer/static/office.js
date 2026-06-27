@@ -22,7 +22,7 @@ import * as THREE from 'three';
 
 const FLOOR_W = 32;
 const FLOOR_D = 30;
-const WALL_H  = 7;
+const WALL_H  = 10;
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
@@ -42,6 +42,7 @@ export function buildOffice(scene, agentConfigs) {
   _buildWalls(scene);
   _buildCeiling(scene, state);
   _buildTickerDisplay(scene, state);
+  try { _buildCompanySign(scene); } catch (e) { console.warn('Company sign skipped:', e); }
   _buildLounge(scene);
   _buildMeetingRoom(scene);
   _buildDesks(scene, agentConfigs, state);
@@ -252,17 +253,94 @@ function _buildTickerDisplay(scene, state) {
   state.tickerCtx     = ctx;
   state.tickerTexture = new THREE.CanvasTexture(cv);
 
+  // Keep the ticker at the same absolute height as the original 7-unit wall so
+  // the extra wall height above it is available for the company sign.
+  const TICKER_Y = 5.5;
+
   const frameGeo = new THREE.BoxGeometry(16, 2.6, 0.22);
   const frameMat = new THREE.MeshLambertMaterial({ color: 0x0a0a0a });
   const frame    = new THREE.Mesh(frameGeo, frameMat);
-  frame.position.set(0, WALL_H - 1.5, -FLOOR_D / 2 + 0.14);
+  frame.position.set(0, TICKER_Y, -FLOOR_D / 2 + 0.14);
   scene.add(frame);
 
   const screenGeo = new THREE.PlaneGeometry(15.4, 2.1);
   const screenMat = new THREE.MeshBasicMaterial({ map: state.tickerTexture });
   const screen    = new THREE.Mesh(screenGeo, screenMat);
-  screen.position.set(0, WALL_H - 1.5, -FLOOR_D / 2 + 0.26);
+  screen.position.set(0, TICKER_Y, -FLOOR_D / 2 + 0.26);
   scene.add(screen);
+}
+
+// ─── Company sign (above ticker display on the back wall) ────────────────────
+
+/**
+ * Builds a dimensional "TradingAgents" nameplate on the back wall, centred
+ * above the LED ticker display.  The sign uses a BoxGeometry with cream-coloured
+ * sides so it reads as a solid 3-D mounted plate; the Cormorant font (loaded via
+ * Google Fonts in index.html) is drawn onto a CanvasTexture once the font is
+ * available and composited onto the front face.
+ */
+function _buildCompanySign(scene) {
+  const signW = 10.0;   // width  (world units)
+  const signH = 0.60;   // height
+  const signD = 0.22;   // depth  — gives the raised-plate 3-D look
+  const signY = WALL_H - 1.6;              // near the top of the wall
+  const signZ = -FLOOR_D / 2 + 0.22;      // flush with the back wall surface
+
+  // ── 3-D backing plate — cream ivory with slightly darker sides ──
+  const faceMat  = new THREE.MeshLambertMaterial({ color: 0xf0ece3 }); // front/back
+  const sideMat  = new THREE.MeshLambertMaterial({ color: 0xc8c2b6 }); // L/R sides
+  const edgeMat  = new THREE.MeshLambertMaterial({ color: 0xd4cfc8 }); // top/bottom
+
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(signW, signH, signD),
+    // Material index order: +X, -X, +Y, -Y, +Z, -Z
+    [sideMat, sideMat, edgeMat, edgeMat, faceMat, faceMat],
+  );
+  box.position.set(0, signY, signZ);
+  scene.add(box);
+
+  // ── Canvas text plane composited onto the front face ──
+  // Canvas dimensions must match the plane's aspect ratio to avoid stretching.
+  // Plane: (signW-0.05) × (signH-0.05) = 9.95 × 0.55 ≈ 18.1 : 1
+  const planeW = signW - 0.05;
+  const planeH = signH - 0.05;
+  const CV_H   = 80;
+  const CV_W   = Math.round((planeW / planeH) * CV_H); // ≈ 1448
+
+  const cv  = document.createElement('canvas');
+  cv.width  = CV_W;
+  cv.height = CV_H;
+  const ctx     = cv.getContext('2d');
+  const texture = new THREE.CanvasTexture(cv);
+
+  const textPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(planeW, planeH),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: true }),
+  );
+  // Position the plane just in front of the box's front face
+  textPlane.position.set(0, signY, signZ + signD / 2 + 0.003);
+  scene.add(textPlane);
+
+  const _draw = () => {
+    ctx.fillStyle = '#f0ece3';
+    ctx.fillRect(0, 0, CV_W, CV_H);
+
+    ctx.fillStyle    = '#000000';
+    ctx.font         = '400 48px "Cormorant", serif';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('TradingAgents', CV_W / 2, CV_H / 2);
+
+    texture.needsUpdate = true;
+  };
+
+  // Draw once the Cormorant font is confirmed available; fall back immediately
+  // if the font API is absent (older browsers will use the first serif found).
+  if (typeof document !== 'undefined' && document.fonts) {
+    document.fonts.load('400 48px "Cormorant"').then(_draw).catch(_draw);
+  } else {
+    _draw();
+  }
 }
 
 // ─── Lounge area (near ticker wall, z ≈ -8 to -10) ──────────────────────────
@@ -436,7 +514,7 @@ function _buildMeetingRoom(scene) {
   const glassMat = new THREE.MeshLambertMaterial({
     color: 0xaaccee,
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.15,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -812,8 +890,8 @@ function _buildNPCTradingDesks(scene, state) {
     _buildStaticNPC(scene, NPC_X[i], 3, NPC_COLORS[i]);
 
     // Point light above each NPC desk, toggled with the rest
-    const pl = new THREE.PointLight(0xfff0d0, 0, 8, 1.8);
-    pl.position.set(NPC_X[i], 5.5, 3);
+    const pl = new THREE.PointLight(0xfff0d0, 0, 13, 1.8);
+    pl.position.set(NPC_X[i], WALL_H - 1.5, 3);
     scene.add(pl);
     state.pointLights.push(pl);
   }
@@ -880,7 +958,7 @@ function _buildPMOffice(scene, state) {
   const glassMat = new THREE.MeshLambertMaterial({
     color: 0xbbddee,
     transparent: true,
-    opacity: 0.26,
+    opacity: 0.19,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
@@ -973,8 +1051,8 @@ function _buildPMOffice(scene, state) {
 
   // Point lights inside PM office
   for (const [px, pz] of [[-2.5, 12.5], [0, 12.5], [2.5, 12.5]]) {
-    const pl = new THREE.PointLight(0xfff0d0, 0, 8, 1.8);
-    pl.position.set(px, 5.5, pz);
+    const pl = new THREE.PointLight(0xfff0d0, 0, 13, 1.8);
+    pl.position.set(px, WALL_H - 1.5, pz);
     scene.add(pl);
     state.pointLights.push(pl);
   }
@@ -995,8 +1073,8 @@ function _buildLighting(scene, agentConfigs, state) {
   // One point light above every agent position (including seated meeting-room
   // characters — their desk position sits inside the meeting room).
   for (const cfg of agentConfigs) {
-    const pl = new THREE.PointLight(0xfff0d0, 0, 8, 1.8);
-    pl.position.set(cfg.desk.x, 5.5, cfg.desk.z);
+    const pl = new THREE.PointLight(0xfff0d0, 0, 13, 1.8);
+    pl.position.set(cfg.desk.x, WALL_H - 1.5, cfg.desk.z);
     scene.add(pl);
     state.pointLights.push(pl);
   }

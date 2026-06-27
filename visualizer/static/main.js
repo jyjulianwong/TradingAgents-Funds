@@ -35,8 +35,8 @@ document.getElementById('label-layer').replaceWith(labelLayer);
 // ─── Scene ───────────────────────────────────────────────────────────────────
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffffff);
-scene.fog = new THREE.Fog(0xffffff, 45, 95);
+scene.background = new THREE.Color(0xf0f0ee);
+scene.fog = new THREE.Fog(0xf0f0ee, 45, 95);
 
 // ─── Camera ──────────────────────────────────────────────────────────────────
 
@@ -178,8 +178,6 @@ function animate() {
   labelRenderer.render(scene, camera);
 }
 
-animate();
-
 // ─── Window resize ────────────────────────────────────────────────────────────
 
 window.addEventListener('resize', () => {
@@ -188,3 +186,5 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   labelRenderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+animate();
