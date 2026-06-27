@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TradingAgents — The Office</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+      color: #fff;
+    }
+
+    /* Three.js canvas fills the viewport */
+    canvas {
+      display: block;
+      position: fixed;
+      top: 0; left: 0;
+    }
+
+    /* CSS2DRenderer overlay for character name labels */
+    #label-layer {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+
+    /* Agent name label style */
+    .agent-label {
+      background: rgba(0, 0, 0, 0.35);
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+      padding: 2px 7px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.12);
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      letter-spacing: 0.03em;
+      opacity: 0.7;
+    }
+
+    /* RPG-style agent dialog boxes */
+    #dialog-box {
+      position: fixed;
+      bottom: 36px; /* sits just above the status bar */
+      left: 0; right: 0;
+      max-height: 162px;
+      background: rgba(2, 4, 16, 0.87);
+      border-top: 1.5px solid rgba(90, 130, 255, 0.3);
+      z-index: 9;
+      display: none; /* DialogBox.js controls this */
+      flex-direction: row;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    .dialog-card {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      border-left: 2px solid var(--agent-color, #555);
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+      transition: opacity 0.3s;
+      max-height: 162px;
+    }
+    .dialog-card:first-child { border-left-width: 2px; }
+    .dialog-card:last-child  { border-right: none; }
+
+    .dialog-card-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px 3px;
+      background: rgba(255, 255, 255, 0.035);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .dialog-dot  { color: var(--agent-color, #aaa); font-size: 8px; flex-shrink: 0; }
+    .dialog-name { color: var(--agent-color, #ccc); font-size: 10px; font-weight: bold; letter-spacing: 0.06em; flex-shrink: 0; }
+    .dialog-badge {
+      margin-left: auto;
+      font-size: 8.5px;
+      letter-spacing: 0.14em;
+      color: rgba(255, 255, 255, 0.3);
+      flex-shrink: 0;
+    }
+
+    .dialog-card-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 5px 10px 6px;
+      font-size: 10.5px;
+      line-height: 1.55;
+      color: rgba(215, 225, 255, 0.72);
+      white-space: pre-wrap;
+      word-break: break-word;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    }
+    .dialog-card-body::-webkit-scrollbar       { width: 4px; }
+    .dialog-card-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 2px; }
+    .dialog-card-body::-webkit-scrollbar-track { background: transparent; }
+
+    /* Bottom status bar */
+    #status-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 36px;
+      background: rgba(0, 0, 0, 0.88);
+      border-top: 1px solid #1e2035;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      font-size: 12px;
+      z-index: 10;
+    }
+
+    #status-text { color: #7a8090; }
+
+    #ticker-badge {
+      font-size: 14px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      color: #4fc3f7;
+      transition: color 0.5s;
+    }
+
+    #hint { color: #3a3f50; font-size: 11px; }
+
+    /* Loading overlay shown until WS connects */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 100;
+      transition: opacity 0.6s;
+    }
+    #loading.hidden { opacity: 0; pointer-events: none; }
+    #loading-title { font-size: 22px; letter-spacing: 4px; color: #4fc3f7; }
+    #loading-sub   { font-size: 12px; color: #444; letter-spacing: 1px; }
+  </style>
+</head>
+<body>
+
+  <!-- Loading screen -->
+  <div id="loading">
+    <div id="loading-title">TRADINGAGENTS</div>
+    <div id="loading-sub">connecting to visualizer…</div>
+  </div>
+
+  <!-- CSS2DRenderer label container (replaced by the renderer) -->
+  <div id="label-layer"></div>
+
+  <!-- RPG dialog boxes (shown by dialog.js when agents are active) -->
+  <div id="dialog-box"></div>
+
+  <!-- Status bar -->
+  <div id="status-bar">
+    <span id="status-text">Out of hours — waiting for analysis to start</span>
+    <span id="ticker-badge"></span>
+    <span id="hint">[L-CLICK] Drag · [SCROLL] Zoom · [R-CLICK] Pan</span>
+  </div>
+
+  <!-- Three.js via importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module" src="/static/main.js"></script>
+</body>
+</html>

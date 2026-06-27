@@ -1015,6 +1015,18 @@ def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
 
 
 def run_analysis(checkpoint: bool | None = None):
+    # Start the 3-D visualizer server and open a browser tab.
+    _viz_bridge = None
+    try:
+        from visualizer import bridge as _vb
+        from visualizer import server as _vs
+        import webbrowser
+        _viz_port = _vs.start()
+        webbrowser.open_new_tab(f"http://127.0.0.1:{_viz_port}")
+        _viz_bridge = _vb
+    except Exception:
+        pass  # visualizer is optional; analysis continues without it
+
     # First get all user selections
     selections = get_user_selections()
 
@@ -1091,6 +1103,24 @@ def run_analysis(checkpoint: bool | None = None):
     message_buffer.add_tool_call = save_tool_call_decorator(message_buffer, "add_tool_call")
     message_buffer.update_report_section = save_report_section_decorator(message_buffer, "update_report_section")
 
+    # Hook agent-status updates to emit visualizer events.
+    if _viz_bridge is not None:
+        _orig_update_agent_status = message_buffer.update_agent_status
+        def _viz_status_hook(agent, status, _orig=_orig_update_agent_status):
+            # Capture the previous status BEFORE calling _orig so we can detect
+            # real transitions.  update_research_team_status("in_progress") is
+            # called on every LangGraph chunk that has debate content, so without
+            # this guard the bridge would receive dozens of rapid agent_active
+            # triplets (Bull → Bear → ResearchMgr), auto-deriving a full circular
+            # handoff cycle each time and overwhelming the walk animation.
+            prev = message_buffer.agent_status.get(agent)
+            _orig(agent, status)
+            if status == "in_progress" and prev != "in_progress":
+                _viz_bridge.emit({"type": "agent_active", "agent": agent})
+            elif status == "completed" and prev == "in_progress":
+                _viz_bridge.emit({"type": "agent_idle", "agent": agent})
+        message_buffer.update_agent_status = _viz_status_hook
+
     # Now start the display layout
     layout = create_layout()
 
@@ -1140,6 +1170,14 @@ def run_analysis(checkpoint: bool | None = None):
         # (LLM tracking is handled separately via LLM constructor)
         args = graph.propagator.get_graph_args(callbacks=[stats_handler])
 
+        # Notify the visualizer that the analysis is starting.
+        if _viz_bridge is not None:
+            _viz_bridge.emit({
+                "type": "workflow_start",
+                "ticker": selections["ticker"],
+                "date": selections["analysis_date"],
+            })
+
         # Stream the analysis
         trace = []
         for chunk in graph.graph.stream(init_agent_state, **args):
@@ -1154,6 +1192,15 @@ def run_analysis(checkpoint: bool | None = None):
                 msg_type, content = classify_message_type(message)
                 if content and content.strip():
                     message_buffer.add_message(msg_type, content)
+                    # Stream AI message text to the visualizer dialog box
+                    if msg_type == "Agent" and _viz_bridge is not None:
+                        current = message_buffer.current_agent
+                        if current:
+                            _viz_bridge.emit({
+                                "type": "agent_message",
+                                "agent": current,
+                                "text": content.strip()[:500],
+                            })
 
                 if hasattr(message, "tool_calls") and message.tool_calls:
                     for tool_call in message.tool_calls:
@@ -1176,8 +1223,16 @@ def run_analysis(checkpoint: bool | None = None):
                 bear_hist = debate_state.get("bear_history", "").strip()
                 judge = debate_state.get("judge_decision", "").strip()
 
-                # Only update status when there's actual content
-                if bull_hist or bear_hist:
+                # Only update status when there's actual content and the research
+                # phase isn't already done.  LangGraph streams full accumulated
+                # state on every chunk, so bull_hist/bear_hist remain non-empty
+                # for the entire run after the first debate exchange.  Without
+                # this guard, every risk-phase chunk would cycle the research
+                # team through completed→in_progress→completed, producing the
+                # round-robin handoff loop seen in the visualizer.
+                if (bull_hist or bear_hist) and (
+                    message_buffer.agent_status.get("Research Manager") != "completed"
+                ):
                     update_research_team_status("in_progress")
                 if bull_hist:
                     message_buffer.update_report_section(
@@ -1191,8 +1246,12 @@ def run_analysis(checkpoint: bool | None = None):
                     message_buffer.update_report_section(
                         "investment_plan", f"### Research Manager Decision\n{judge}"
                     )
-                    update_research_team_status("completed")
-                    message_buffer.update_agent_status("Trader", "in_progress")
+                    # Guard prevents repeated firings on post-research chunks: once
+                    # Research Manager is "completed" this block is a no-op anyway,
+                    # but skipping avoids Trader flashing active→idle every chunk.
+                    if message_buffer.agent_status.get("Research Manager") != "completed":
+                        update_research_team_status("completed")
+                        message_buffer.update_agent_status("Trader", "in_progress")
 
             # Trading Team
             if chunk.get("trader_investment_plan"):
@@ -1253,6 +1312,18 @@ def run_analysis(checkpoint: bool | None = None):
         # Update all agent statuses to completed
         for agent in message_buffer.agent_status:
             message_buffer.update_agent_status(agent, "completed")
+
+        # Notify the visualizer of the final rating so the ticker display updates.
+        if _viz_bridge is not None:
+            try:
+                _final_signal = graph.process_signal(final_state.get("final_trade_decision", ""))
+            except Exception:
+                _final_signal = "HOLD"
+            _viz_bridge.emit({
+                "type": "workflow_complete",
+                "signal": _final_signal,
+                "ticker": selections["ticker"],
+            })
 
         message_buffer.add_message(
             "System", f"Completed analysis for {selections['analysis_date']}"
