@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TradingAgents — Research Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@200..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Top bar ─────────────────────────────────────────────── -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <span class="logo">TRADINGAGENTS</span>
+        <span class="tb-sep">|</span>
+        <span class="subtitle">RESEARCH ARCHIVE</span>
+      </div>
+      <div id="topbar-stats">
+        <span class="stat"><span class="stat-label">TICKERS</span><span id="s-tickers">--</span></span>
+        <span class="tb-sep">│</span>
+        <span class="stat"><span class="stat-label">RUNS</span><span id="s-runs">--</span></span>
+        <span class="tb-sep">│</span>
+        <span class="stat"><span class="stat-label">VIZ&nbsp;LOGS</span><span id="s-events">--</span></span>
+      </div>
+      <div id="clock"></div>
+    </header>
+
+    <!-- ── Main split ──────────────────────────────────────────── -->
+    <div id="main">
+
+      <!-- Left sidebar -->
+      <aside id="sidebar">
+        <div id="tab-bar">
+          <button class="tab active" id="tab-reports" onclick="switchTab('reports')">
+            <span class="tab-key">F1</span>&nbsp;REPORTS
+          </button>
+          <button class="tab" id="tab-events" onclick="switchTab('events')">
+            <span class="tab-key">F2</span>&nbsp;VIZ&nbsp;EVENTS
+          </button>
+        </div>
+        <div id="search-bar">
+          <span class="search-icon">&#x2315;</span>
+          <input id="search-input" type="text" placeholder="FILTER..." oninput="filterTree(this.value)" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="bulk-bar" class="hidden">
+          <span id="bulk-count"></span>
+          <button class="btn-bulk-del" onclick="execBulkDelete()">&#x2715;&nbsp;DELETE</button>
+          <button class="btn-bulk-clear" onclick="clearSelection()">CLEAR</button>
+        </div>
+        <div id="tree-container"></div>
+      </aside>
+
+      <!-- Resize handle -->
+      <div id="resize-handle" onmousedown="startResize(event)"></div>
+
+      <!-- Content panel -->
+      <main id="content-area">
+        <div id="content-header" class="hidden">
+          <div id="content-path-wrap">
+            <span class="path-label">PATH&nbsp;</span>
+            <span id="content-path"></span>
+          </div>
+          <div id="content-actions">
+            <span id="content-signal"></span>
+            <button id="btn-del-file" class="btn-danger hidden" onclick="deleteCurrentFile()">&#x2715;&nbsp;DEL FILE</button>
+            <button id="btn-del-run"  class="btn-danger hidden" onclick="deleteCurrentRun()">&#x2715;&nbsp;DEL RUN</button>
+          </div>
+        </div>
+
+        <div id="content-body">
+          <!-- Welcome splash -->
+          <div id="welcome">
+            <div class="splash">
+              <div class="splash-logo">TRADINGAGENTS</div>
+              <div class="splash-sub">RESEARCH ARCHIVE TERMINAL</div>
+              <div class="splash-grid">
+                <div class="splash-cell"><span class="key">F1</span>Browse Reports</div>
+                <div class="splash-cell"><span class="key">F2</span>Visualizer Event Logs</div>
+                <div class="splash-cell"><span class="key">Click</span>Open / Preview File</div>
+                <div class="splash-cell"><span class="key">DEL</span>Remove File or Run</div>
+              </div>
+              <div class="splash-hint">SELECT AN ITEM FROM THE LEFT PANEL TO BEGIN</div>
+            </div>
+          </div>
+
+          <!-- Markdown renderer -->
+          <div id="md-view" class="hidden"></div>
+
+          <!-- Raw log / text renderer -->
+          <div id="raw-view" class="hidden"></div>
+
+          <!-- JSONL events timeline -->
+          <div id="evt-view" class="hidden"></div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ── Status bar ──────────────────────────────────────────── -->
+    <footer id="statusbar">
+      <span id="status-text">READY</span>
+      <span class="sb-sep">│</span>
+      <span id="status-path">NO FILE SELECTED</span>
+    </footer>
+
+  </div><!-- /#app -->
+
+  <!-- ── Confirm modal ──────────────────────────────────────────── -->
+  <div id="modal-overlay" class="hidden" onclick="if(event.target===this)closeModal()">
+    <div id="modal">
+      <div id="modal-title">CONFIRM DELETE</div>
+      <div id="modal-body"></div>
+      <div id="modal-footer">
+        <button id="modal-ok"     class="btn-danger"     onclick="modalConfirm()">CONFIRM&nbsp;DELETE</button>
+        <button id="modal-cancel" class="btn-secondary"  onclick="closeModal()">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="/static/main.js"></script>
+</body>
+</html>
