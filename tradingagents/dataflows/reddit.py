@@ -21,6 +21,7 @@ import html
 import http.client
 import json
 import logging
+import os
 import re
 import time
 import xml.etree.ElementTree as ET
@@ -48,13 +49,20 @@ DEFAULT_SUBREDDITS = ("wallstreetbets", "stocks", "investing")
 
 
 def _search_qs(ticker: str, limit: int) -> str:
-    return urlencode({
+    params: dict = {
         "q": ticker,
         "restrict_sr": "on",
         "sort": "new",
         "t": "week",  # last 7 days
         "limit": limit,
-    })
+    }
+    reddit_rss_feed_token = os.environ.get("REDDIT_RSS_FEED_TOKEN", "").strip()
+    reddit_username = os.environ.get("REDDIT_USERNAME", "").strip()
+    if reddit_rss_feed_token:
+        params["feed"] = reddit_rss_feed_token
+    if reddit_username:
+        params["user"] = reddit_username
+    return urlencode(params)
 
 
 def _iso_to_timestamp(iso_str: str | None) -> float | None:
