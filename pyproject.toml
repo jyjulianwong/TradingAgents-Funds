@@ -44,6 +44,14 @@ dev = [
 bedrock = [
     "langchain-aws>=1.5.0",
 ]
+dashboard = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]
+visualizer = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]
 
 [project.scripts]
 tradingagents = "cli.main:app"

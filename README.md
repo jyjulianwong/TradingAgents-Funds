@@ -121,16 +121,6 @@ Install the package and its dependencies:
 pip install .
 ```
 
-If you want to use the visualizer, install the extra dependencies with:
-```bash
-pip install -r visualizer/requirements.txt
-```
-
-If you want to use the dashboard, install the extra dependencies with:
-```bash
-pip install -r dashboard/requirements.txt
-```
-
 ### Docker
 
 Alternatively, run with Docker:
