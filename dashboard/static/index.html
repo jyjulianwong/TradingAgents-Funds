@@ -20,6 +20,8 @@
         <span class="subtitle">RESEARCH ARCHIVE</span>
       </div>
       <div id="topbar-stats">
+        <span class="stat"><span class="stat-label">REPORTS</span><span id="s-reports">--</span></span>
+        <span class="tb-sep">│</span>
         <span class="stat"><span class="stat-label">TICKERS</span><span id="s-tickers">--</span></span>
         <span class="tb-sep">│</span>
         <span class="stat"><span class="stat-label">RUNS</span><span id="s-runs">--</span></span>
@@ -35,11 +37,14 @@
       <!-- Left sidebar -->
       <aside id="sidebar">
         <div id="tab-bar">
-          <button class="tab active" id="tab-reports" onclick="switchTab('reports')">
+          <button class="tab active" id="tab-finalreports" onclick="switchTab('finalreports')">
             <span class="tab-key">F1</span>&nbsp;REPORTS
           </button>
+          <button class="tab" id="tab-reports" onclick="switchTab('reports')">
+            <span class="tab-key">F2</span>&nbsp;LOGS
+          </button>
           <button class="tab" id="tab-events" onclick="switchTab('events')">
-            <span class="tab-key">F2</span>&nbsp;VIZ&nbsp;EVENTS
+            <span class="tab-key">F3</span>&nbsp;VIZ&nbsp;EVENTS
           </button>
         </div>
         <div id="search-bar">
@@ -79,9 +84,9 @@
               <div class="splash-sub">RESEARCH ARCHIVE TERMINAL</div>
               <div class="splash-grid">
                 <div class="splash-cell"><span class="key">F1</span>Browse Reports</div>
-                <div class="splash-cell"><span class="key">F2</span>Visualizer Event Logs</div>
+                <div class="splash-cell"><span class="key">F2</span>Browse Logs</div>
+                <div class="splash-cell"><span class="key">F3</span>Visualizer Event Logs</div>
                 <div class="splash-cell"><span class="key">Click</span>Open / Preview File</div>
-                <div class="splash-cell"><span class="key">DEL</span>Remove File or Run</div>
               </div>
               <div class="splash-hint">SELECT AN ITEM FROM THE LEFT PANEL TO BEGIN</div>
             </div>

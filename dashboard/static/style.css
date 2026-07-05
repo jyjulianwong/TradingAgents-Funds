@@ -29,7 +29,7 @@
   --border-hi:    #3a3a3a;
 
   /* Layout */
-  --sidebar-w:    310px;
+  --sidebar-w:    360px;
   --topbar-h:     46px;
   --statusbar-h:  28px;
   --font:         'Inconsolata', 'Courier New', 'Lucida Console', Monaco, Consolas, monospace;

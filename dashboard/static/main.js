@@ -2,21 +2,27 @@
 
 // ── State ────────────────────────────────────────────────────────
 const S = {
-  tab:            'reports',
-  reports:        {},          // { ticker: [{date, signal, file_count}] }
-  events:         [],          // [{name, size, mtime}]
-  expanded:       new Set(),   // "ticker" or "ticker/date" keys
-  currentTicker:  null,
-  currentDate:    null,
-  currentFile:    null,        // relative path within the run
-  currentEvtFile: null,
-  filter:         '',
-  runFiles:       {},          // cache: "ticker/date" -> [{path, ...}]
-  isinNames:      {},          // { ISIN: "Fund Name" }
-  baseDir:        '',          // resolved ~/.tradingagents path from server
-  selected:       new Set(),   // "ticker/date" keys of selected runs
-  selectedEvts:   new Set(),   // event log filenames selected for bulk delete
-  pendingOk:      null,        // function to call on modal confirm
+  tab:             'finalreports',
+  finalreports:    {},          // { ticker: [{folder, date, time, signal, file_count}] }
+  reports:         {},          // { ticker: [{date, signal, file_count}] }
+  events:          [],          // [{name, size, mtime}]
+  frExpanded:      new Set(),   // ticker keys and folder keys (final reports tab)
+  expanded:        new Set(),   // "ticker" or "ticker/date" keys (logs tab)
+  currentFRFolder: null,
+  currentFRFile:   null,
+  currentTicker:   null,
+  currentDate:     null,
+  currentFile:     null,        // relative path within the run
+  currentEvtFile:  null,
+  filter:          '',
+  frFiles:         {},          // cache: folder -> [paths]
+  runFiles:        {},          // cache: "ticker/date" -> [{path, ...}]
+  isinNames:       {},          // { ISIN: "Fund Name" }
+  reportsDir:      '',          // resolved ./reports path from server
+  baseDir:         '',          // resolved ~/.tradingagents path from server
+  selected:        new Set(),   // "ticker/date" keys of selected runs
+  selectedEvts:    new Set(),   // event log filenames selected for bulk delete
+  pendingOk:       null,        // function to call on modal confirm
 };
 
 // ── Clock ────────────────────────────────────────────────────────
@@ -34,8 +40,9 @@ const S = {
 // ── Keyboard shortcuts ────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); return; }
-  if (e.key === 'F1') { e.preventDefault(); switchTab('reports'); }
-  if (e.key === 'F2') { e.preventDefault(); switchTab('events'); }
+  if (e.key === 'F1') { e.preventDefault(); switchTab('finalreports'); }
+  if (e.key === 'F2') { e.preventDefault(); switchTab('reports'); }
+  if (e.key === 'F3') { e.preventDefault(); switchTab('events'); }
 });
 
 // ── Fetch helpers ─────────────────────────────────────────────────
@@ -62,6 +69,7 @@ function status(text, path) {
 async function loadStats() {
   try {
     const d = await apiFetch('GET', '/api/stats');
+    document.getElementById('s-reports').textContent = d.reports;
     document.getElementById('s-tickers').textContent = d.tickers;
     document.getElementById('s-runs').textContent    = d.runs;
     document.getElementById('s-events').textContent  = d.event_logs;
@@ -76,26 +84,189 @@ async function loadBaseDir() {
   try { S.baseDir = (await apiFetch('GET', '/api/base-dir')).path; } catch {}
 }
 
+async function loadReportsDir() {
+  try { S.reportsDir = (await apiFetch('GET', '/api/reports-dir')).path; } catch {}
+}
+
 // ── Tab switch ────────────────────────────────────────────────────
 function switchTab(tab) {
   S.tab = tab;
+  document.getElementById('tab-finalreports').classList.toggle('active', tab === 'finalreports');
   document.getElementById('tab-reports').classList.toggle('active', tab === 'reports');
   document.getElementById('tab-events').classList.toggle('active', tab === 'events');
   S.selected.clear();
   S.selectedEvts.clear();
   updateBulkBar();
   clearContent();
-  tab === 'reports' ? loadReports() : loadEventsTab();
+  if (tab === 'finalreports') loadFinalReports();
+  else if (tab === 'reports') loadReports();
+  else loadEventsTab();
 }
 
 // ── Filter ────────────────────────────────────────────────────────
 function filterTree(val) {
   S.filter = val.trim().toUpperCase();
-  S.tab === 'reports' ? renderTree() : renderEvtList();
+  if (S.tab === 'finalreports') renderFRTree();
+  else if (S.tab === 'reports') renderTree();
+  else renderEvtList();
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  REPORTS
+//  FINAL REPORTS TAB
+// ══════════════════════════════════════════════════════════════════
+
+async function loadFinalReports() {
+  status('LOADING...', '');
+  document.getElementById('tree-container').innerHTML =
+    '<div class="msg-empty">LOADING...</div>';
+  try {
+    S.finalreports = await apiFetch('GET', '/api/finalreports');
+    renderFRTree();
+    status('READY', 'NO FILE SELECTED');
+  } catch (e) {
+    status('ERROR', e.message);
+    document.getElementById('tree-container').innerHTML =
+      `<div class="msg-empty">ERROR: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderFRTree() {
+  const tickers = Object.keys(S.finalreports).sort();
+  const filtered = S.filter
+    ? tickers.filter(t => t.includes(S.filter) || (S.isinNames[t] || '').toUpperCase().includes(S.filter))
+    : tickers;
+  const tc = document.getElementById('tree-container');
+  if (!filtered.length) {
+    tc.innerHTML = `<div class="msg-empty">${S.filter ? 'NO MATCHES' : 'NO REPORTS FOUND'}</div>`;
+    return;
+  }
+  tc.innerHTML = filtered.map(t => renderFRTickerNode(t)).join('');
+}
+
+function renderFRTickerNode(t) {
+  const runs     = S.finalreports[t] || [];
+  const isOpen   = S.frExpanded.has(t);
+  const fundName = S.isinNames[t] || '';
+  return `
+    <div class="tree-ticker">
+      <div class="tree-ticker-hdr ${isOpen ? 'open' : ''}" data-action="fr-ticker" data-ticker="${at(t)}">
+        <span class="chevron">&#x25BA;</span>
+        <span class="ticker-label">
+          <span class="ticker-name">${esc(t)}</span>
+          ${fundName ? `<span class="ticker-fund-name">${esc(fundName)}</span>` : ''}
+        </span>
+        <span class="ticker-meta">${runs.length}&nbsp;run${runs.length !== 1 ? 's' : ''}</span>
+      </div>
+      ${isOpen ? `<div class="tree-dates visible">${runs.map(r => renderFRRunNode(r)).join('')}</div>` : ''}
+    </div>`;
+}
+
+function renderFRRunNode(run) {
+  const isOpen  = S.frExpanded.has(run.folder);
+  const sigHtml = run.signal
+    ? `<span class="sig sig-${run.signal}">${esc(run.signal)}</span>`
+    : '';
+  const filesHtml = isOpen ? renderFRFilesSection(run.folder) : '';
+  return `
+    <div class="tree-date">
+      <div class="tree-date-hdr ${isOpen ? 'open' : ''}" data-action="fr-run" data-folder="${at(run.folder)}">
+        <span class="chevron">&#x25BA;</span>
+        <span class="date-label">${esc(run.date)}&nbsp;<span style="opacity:0.55">${esc(run.time)}</span></span>
+        ${sigHtml}
+      </div>
+      ${filesHtml}
+    </div>`;
+}
+
+function renderFRFilesSection(folder) {
+  const files = S.frFiles[folder];
+  let inner;
+  if (!files) {
+    inner = '<div class="msg-empty" style="font-size:10px;padding:4px 8px;">LOADING...</div>';
+    loadFRFiles(folder);
+  } else if (!files.length) {
+    inner = '<div class="msg-empty" style="font-size:10px;padding:4px 8px;">NO FILES</div>';
+  } else {
+    inner = files.map(f => renderFRFileItem(folder, f)).join('');
+  }
+  return `<div class="tree-files visible" id="fr-files-${safeId(folder)}">${inner}</div>`;
+}
+
+function renderFRFileItem(folder, f) {
+  const isActive = S.currentFRFolder === folder && S.currentFRFile === f;
+  const fname    = f.split('/').pop();
+  const icon     = f.endsWith('.md') ? '&#x25A0;' : '&#x25C6;';
+  return `
+    <div class="tree-file-item ${isActive ? 'active' : ''}"
+         data-action="fr-file"
+         data-folder="${at(folder)}" data-file="${at(f)}"
+         title="${esc(f)}">
+      <span class="file-icon">${icon}</span>
+      <span class="file-label">${esc(fname)}</span>
+    </div>`;
+}
+
+async function loadFRFiles(folder) {
+  try {
+    const run = await apiFetch('GET', `/api/finalreports/${enc(folder)}`);
+    S.frFiles[folder] = run.files || [];
+    const section = document.getElementById(`fr-files-${safeId(folder)}`);
+    if (section) {
+      section.innerHTML = S.frFiles[folder].length
+        ? S.frFiles[folder].map(f => renderFRFileItem(folder, f)).join('')
+        : '<div class="msg-empty" style="font-size:10px;padding:4px 8px;">NO FILES</div>';
+    }
+  } catch (e) {
+    const section = document.getElementById(`fr-files-${safeId(folder)}`);
+    if (section) section.innerHTML =
+      `<div class="msg-empty" style="font-size:10px;padding:4px 8px;">ERROR: ${esc(e.message)}</div>`;
+  }
+}
+
+async function openFRFile(folder, file) {
+  S.currentFRFolder = folder;
+  S.currentFRFile   = file;
+  S.currentTicker   = null;
+  S.currentDate     = null;
+  S.currentFile     = null;
+  S.currentEvtFile  = null;
+
+  const pathStr = `${S.reportsDir}/${folder}/${file}`;
+  status('LOADING...', pathStr);
+  showContentHeader(pathStr, null, false, false);
+
+  try {
+    const content = await apiFetch(
+      'GET',
+      `/api/finalreports/${enc(folder)}/content`,
+      { path: file }
+    );
+    const sig = detectSignal(content);
+    updateContentSignal(sig);
+    hideAllViews();
+    if (file.endsWith('.md')) {
+      const el = document.getElementById('md-view');
+      el.classList.remove('hidden');
+      el.innerHTML = marked.parse(content);
+      highlightSignalsInDom(el);
+    } else {
+      const el = document.getElementById('raw-view');
+      el.classList.remove('hidden');
+      el.textContent = content;
+    }
+    renderFRTree();
+    status('READY', pathStr);
+  } catch (err) {
+    status('ERROR', err.message);
+    hideAllViews();
+    const el = document.getElementById('raw-view');
+    el.classList.remove('hidden');
+    el.textContent = `Error loading file:\n${err.message}`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  REPORTS (LOGS)
 // ══════════════════════════════════════════════════════════════════
 
 async function loadReports() {
@@ -241,7 +412,16 @@ document.getElementById('tree-container').addEventListener('click', e => {
   const t      = el.dataset.ticker;
   const date   = el.dataset.date;
 
-  if (action === 'ticker') {
+  if (action === 'fr-ticker') {
+    S.frExpanded.has(t) ? S.frExpanded.delete(t) : S.frExpanded.add(t);
+    renderFRTree();
+  } else if (action === 'fr-run') {
+    const folder = el.dataset.folder;
+    S.frExpanded.has(folder) ? S.frExpanded.delete(folder) : S.frExpanded.add(folder);
+    renderFRTree();
+  } else if (action === 'fr-file') {
+    openFRFile(el.dataset.folder, el.dataset.file);
+  } else if (action === 'ticker') {
     S.expanded.has(t) ? S.expanded.delete(t) : S.expanded.add(t);
     renderTree();
   } else if (action === 'date') {
@@ -484,6 +664,7 @@ function updateContentSignal(sig) {
 }
 
 function clearContent() {
+  S.currentFRFolder = S.currentFRFile = null;
   S.currentTicker = S.currentDate = S.currentFile = S.currentEvtFile = null;
   hideAllViews();
   document.getElementById('welcome').classList.remove('hidden');
@@ -741,4 +922,4 @@ function safeId(s) { return s.replace(/[^a-zA-Z0-9_-]/g, '_'); }
 
 // ── Boot ──────────────────────────────────────────────────────────
 loadStats();
-Promise.all([loadBaseDir(), loadIsinNames()]).then(() => loadReports());
+Promise.all([loadBaseDir(), loadReportsDir(), loadIsinNames()]).then(() => loadFinalReports());

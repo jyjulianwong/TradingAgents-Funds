@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = Path(os.environ.get("TRADINGAGENTS_DIR", Path.home() / ".tradingagents")).resolve()
 LOGS_DIR = BASE_DIR / "logs"
 EVENTS_DIR = BASE_DIR / "visualizer_events"
+REPORTS_DIR = Path(os.environ.get("TRADINGAGENTS_REPORTS_DIR", Path(__file__).parent.parent / "reports")).resolve()
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="TradingAgents Dashboard", docs_url=None, redoc_url=None)
@@ -39,10 +40,34 @@ def _safe_path(base: Path, *parts: str) -> Path:
     return resolved
 
 
+def _parse_report_folder(name: str) -> tuple[str, str, str] | None:
+    """Parse {ticker}_{YYYYMMDD}_{HHMMSS} into (ticker, formatted_date, formatted_time)."""
+    parts = name.rsplit("_", 2)
+    if len(parts) == 3 and parts[1].isdigit() and len(parts[1]) == 8 and parts[2].isdigit() and len(parts[2]) == 6:
+        ticker, d, t = parts
+        return ticker, f"{d[:4]}-{d[4:6]}-{d[6:8]}", f"{t[:2]}:{t[2:4]}:{t[4:6]}"
+    return None
+
+
 def _extract_signal(date_dir: Path) -> str | None:
     """Try to extract BUY/SELL/HOLD/OVERWEIGHT/UNDERWEIGHT from the final decision file."""
     for candidate in ("reports/final_trade_decision.md", "final_trade_decision.md"):
         f = date_dir / candidate
+        if f.exists():
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")[:3000]
+            except OSError:
+                return None
+            m = _SIGNAL_RE.search(text)
+            if m:
+                return (m.group(1) or m.group(2)).upper()
+    return None
+
+
+def _extract_report_signal(folder: Path) -> str | None:
+    """Extract signal from a final-reports folder (5_portfolio/decision.md or complete_report.md)."""
+    for candidate in ("5_portfolio/decision.md", "complete_report.md"):
+        f = folder / candidate
         if f.exists():
             try:
                 text = f.read_text(encoding="utf-8", errors="replace")[:3000]
@@ -138,6 +163,69 @@ async def delete_file(
     return {"deleted": path}
 
 
+@app.get("/api/finalreports")
+async def list_final_reports() -> dict:
+    """Return {ticker: [{folder, date, time, signal, file_count}]} grouped tree."""
+    if not REPORTS_DIR.exists():
+        return {}
+    result: dict = {}
+    for item in sorted(REPORTS_DIR.iterdir()):
+        if not item.is_dir():
+            continue
+        parsed = _parse_report_folder(item.name)
+        if not parsed:
+            continue
+        ticker, date, time = parsed
+        file_count = sum(1 for f in item.rglob("*") if f.is_file())
+        result.setdefault(ticker, []).append(
+            {
+                "folder": item.name,
+                "date": date,
+                "time": time,
+                "signal": _extract_report_signal(item),
+                "file_count": file_count,
+            }
+        )
+    for ticker in result:
+        result[ticker].sort(key=lambda r: r["folder"], reverse=True)
+    return result
+
+
+@app.get("/api/finalreports/{folder}")
+async def get_final_report(folder: str) -> dict:
+    folder_path = _safe_path(REPORTS_DIR, folder)
+    if not folder_path.is_dir():
+        raise HTTPException(status_code=404, detail="Report not found")
+    files = sorted(str(f.relative_to(folder_path)) for f in folder_path.rglob("*") if f.is_file())
+    parsed = _parse_report_folder(folder)
+    ticker, date, time = parsed if parsed else ("", "", "")
+    return {
+        "folder": folder,
+        "ticker": ticker,
+        "date": date,
+        "time": time,
+        "signal": _extract_report_signal(folder_path),
+        "files": files,
+    }
+
+
+@app.get("/api/finalreports/{folder}/content")
+async def get_final_report_content(
+    folder: str, path: str = Query(...)
+) -> PlainTextResponse:
+    folder_path = _safe_path(REPORTS_DIR, folder)
+    file_path = _safe_path(folder_path, path)
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return PlainTextResponse(file_path.read_text(encoding="utf-8", errors="replace"))
+
+
+@app.get("/api/reports-dir")
+async def get_reports_dir() -> dict:
+    """Return the resolved final-reports directory path."""
+    return {"path": str(REPORTS_DIR)}
+
+
 @app.get("/api/events")
 async def list_events() -> list:
     if not EVENTS_DIR.exists():
@@ -200,7 +288,12 @@ async def get_stats() -> dict:
                 tickers += 1
                 runs += sum(1 for dd in td.iterdir() if dd.is_dir())
     event_logs = len(list(EVENTS_DIR.glob("*.jsonl"))) if EVENTS_DIR.exists() else 0
-    return {"tickers": tickers, "runs": runs, "event_logs": event_logs}
+    reports = (
+        sum(1 for item in REPORTS_DIR.iterdir() if item.is_dir() and _parse_report_folder(item.name))
+        if REPORTS_DIR.exists()
+        else 0
+    )
+    return {"tickers": tickers, "runs": runs, "event_logs": event_logs, "reports": reports}
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
