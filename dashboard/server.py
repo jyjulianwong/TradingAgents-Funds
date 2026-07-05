@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = Path(os.environ.get("TRADINGAGENTS_DIR", Path.home() / ".tradingagents")).resolve()
 LOGS_DIR = BASE_DIR / "logs"
 EVENTS_DIR = BASE_DIR / "visualizer_events"
-REPORTS_DIR = Path(os.environ.get("TRADINGAGENTS_REPORTS_DIR", Path(__file__).parent.parent / "reports")).resolve()
+REPORTS_DIR = Path(__file__).parent.parent / "reports"
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="TradingAgents Dashboard", docs_url=None, redoc_url=None)
