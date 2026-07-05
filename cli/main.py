@@ -552,8 +552,8 @@ def get_user_selections():
         )
 
     # Step 2: Analysis date (skipped when set via TRADINGAGENTS_ANALYSIS_DATE)
-    if os.environ.get("TRADINGAGENTS_ANALYSIS_DATE"):
-        analysis_date = os.environ["TRADINGAGENTS_ANALYSIS_DATE"].strip()
+    if DEFAULT_CONFIG.get("analysis_date"):
+        analysis_date = DEFAULT_CONFIG["analysis_date"]
         console.print(f"[green]✓ Analysis date from environment:[/green] {analysis_date}")
     else:
         default_date = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -582,8 +582,8 @@ def get_user_selections():
         output_language = ask_output_language()
 
     # Step 4: Select analysts (skipped when set via TRADINGAGENTS_ANALYSTS)
-    if os.environ.get("TRADINGAGENTS_ANALYSTS"):
-        raw_analysts = os.environ["TRADINGAGENTS_ANALYSTS"]
+    if DEFAULT_CONFIG.get("analysts"):
+        raw_analysts = DEFAULT_CONFIG["analysts"]
         valid_values = {a.value for a in AnalystType}
         parsed = [
             AnalystType(k.strip().lower())
@@ -1017,15 +1017,16 @@ def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
 def run_analysis(checkpoint: bool | None = None):
     # Start the 3-D visualizer server and open a browser tab.
     _viz_bridge = None
-    try:
-        import webbrowser
+    if DEFAULT_CONFIG["enable_visualizer"]:
+        try:
+            import webbrowser
 
-        from visualizer import bridge as _vb, server as _vs
-        _viz_port = _vs.start()
-        webbrowser.open_new_tab(f"http://127.0.0.1:{_viz_port}")
-        _viz_bridge = _vb
-    except Exception:
-        pass  # visualizer is optional; analysis continues without it
+            from visualizer import bridge as _vb, server as _vs
+            _viz_port = _vs.start()
+            webbrowser.open_new_tab(f"http://127.0.0.1:{_viz_port}")
+            _viz_bridge = _vb
+        except Exception:
+            pass  # visualizer is optional; analysis continues without it
 
     # First get all user selections
     selections = get_user_selections()

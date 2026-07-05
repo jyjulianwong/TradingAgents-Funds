@@ -25,6 +25,10 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":   "google_thinking_level",
     "TRADINGAGENTS_OPENAI_REASONING_EFFORT": "openai_reasoning_effort",
     "TRADINGAGENTS_ANTHROPIC_EFFORT":        "anthropic_effort",
+    # CLI-only presets
+    "TRADINGAGENTS_ANALYSIS_DATE":        "analysis_date",
+    "TRADINGAGENTS_ANALYSTS":             "analysts",
+    "TRADINGAGENTS_ENABLE_VISUALIZER":    "enable_visualizer",
 }
 
 
@@ -196,7 +200,7 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "GB00BN091933": ["IWDP.L"],  # iShares Enviro & Low Carbon Tilt Real Estate S Acc (FTSE EPRA Nareit proxy)
         "GB00BN08ZG51": ["EWJ"],  # iShares Japan Equity Index S Acc (FTSE Japan)
         "GB00BN08ZQ59": ["EPP"],  # iShares Pacific ex Japan Equity Index S Acc
-        "GB00BG0QP042": ["EXU.L"],  # L&G European Index C Acc (FTSE World Europe ex UK)
+        "GB00BG0QP042": ["ASML", "ROG.SW", "NOVN.SW"],  # L&G European Index C Acc (FTSE World Europe ex UK)
         "GB00BL6C2119": ["EEM"],  # L&G Future World ESG Tilted & Opt Emerging Markets C Acc
         "GB00BMFXWS95": ["IWDA.L"],  # L&G Future World ESG Tilted & Opt Developed C Acc
         "GB00BJLP1W53": ["IXN"],  # L&G Global Technology Index Trust C Acc (FTSE World Technology)
@@ -209,5 +213,10 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "GB00BVLL5586": ["GOLD", "NEM", "AU"],  # Ninety One Global Gold B Inc (top 3 holdings)
         "GB00B76V7Q08": ["JNJ", "LLY", "UNH"],  # Schroder Global Healthcare Z Acc (top 3 holdings)
         "GB00B56FW078": ["XOM", "SHEL", "COP"]  # WS Guinness Global Energy I Acc (largest weights, proxy via sister strategy)
-    }
+    },
+    # CLI-only settings — consumed by cli/main.py; ignored by the programmatic API.
+    # None means "ask interactively"; a non-None value skips the interactive prompt.
+    "analysis_date": None,      # YYYY-MM-DD string; None → prompt
+    "analysts": None,           # comma-separated analyst keys; None → prompt
+    "enable_visualizer": True,  # False → skip the 3-D visualizer server / browser tab
 })
