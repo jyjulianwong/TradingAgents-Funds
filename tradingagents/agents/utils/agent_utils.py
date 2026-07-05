@@ -1,5 +1,6 @@
 import functools
 import logging
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -41,12 +42,55 @@ __all__ = [
     "get_verified_market_snapshot",
     "build_instrument_context",
     "resolve_instrument_identity",
+    "resolve_isin_ticker_list",
     "get_instrument_context_from_state",
     "get_language_instruction",
     "create_msg_delete",
 ]
 
 logger = logging.getLogger(__name__)
+
+# Matches the standard 12-character ISIN format: 2-letter country code,
+# 9 alphanumeric characters, 1 numeric check digit.
+_ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+
+
+def resolve_isin_ticker_list(ticker: str) -> list[str]:
+    """Return the ordered list of symbols to analyse for a given ticker.
+
+    For ordinary stock/crypto tickers, returns ``[ticker]``. When the input
+    looks like an ISIN and an entry exists in ``isin_ticker_map``, returns
+    ``[ticker] + mapped_tickers`` so that both the fund's own NAV price series
+    and the exchange-traded proxy holdings are queried. For ISINs with no
+    mapping, returns ``[ticker]`` with a warning (volume and financial-statement
+    data will likely be unavailable).
+
+    Index 0 is always the original ticker (or ISIN); indices 1+ are the
+    configured proxies. Each analyst slices as appropriate — the market and
+    fundamentals analysts use the full list; the sentiment analyst passes the
+    full list too, with the ISIN appearing as a labelled section that will
+    typically show empty social-media results (correctly signalling that the
+    fund is not discussed under its ISIN on retail platforms).
+    """
+    if not _ISIN_RE.match(ticker.strip().upper()):
+        return [ticker]
+
+    from tradingagents.dataflows.config import get_config
+
+    isin_map = get_config().get("isin_ticker_map", {})
+    mapped = isin_map.get(ticker.upper()) or isin_map.get(ticker)
+    if mapped:
+        return [ticker] + list(mapped)
+
+    logger.warning(
+        "resolve_isin_ticker_list: %r looks like an ISIN but has no entry in "
+        "DEFAULT_CONFIG['isin_ticker_map']. Only the ISIN itself will be queried "
+        "— volume and financial-statement data will likely be unavailable. "
+        "Add a mapping to fix this, e.g. \"%s\": [\"TICKER1\", \"TICKER2\"].",
+        ticker,
+        ticker.upper(),
+    )
+    return [ticker]
 
 
 def get_language_instruction() -> str:
@@ -123,6 +167,7 @@ def build_instrument_context(
     ticker: str,
     asset_type: str = "stock",
     identity: Mapping[str, str] | None = None,
+    mapped_tickers: list[str] | None = None,
 ) -> str:
     """Describe the exact instrument so agents preserve identity and ticker.
 
@@ -130,6 +175,12 @@ def build_instrument_context(
     :func:`resolve_instrument_identity`), the company name and business
     classification are injected so agents anchor to the real company rather
     than pattern-matching the price chart to a wrong one (#814).
+
+    When ``mapped_tickers`` is provided the instrument is a fund identified by
+    ISIN. A note is appended explaining that market and fundamentals reports
+    contain data sections for each proxy, so downstream agents (researchers,
+    risk debaters, trader, PM) know to treat proxy data as representative of
+    the fund.
     """
     is_crypto = asset_type == "crypto"
     instrument_label = "asset" if is_crypto else "instrument"
@@ -166,6 +217,18 @@ def build_instrument_context(
             " Treat it as a crypto asset rather than a company, and do not "
             "assume company fundamentals are available."
         )
+
+    if mapped_tickers:
+        context += (
+            f" This instrument is a fund identified by ISIN {ticker}. Because fund"
+            f" vehicles do not report exchange-traded volume or corporate financial"
+            f" statements, the following proxy tickers have been mapped as"
+            f" representative underlying holdings: {', '.join(mapped_tickers)}."
+            f" The market and fundamentals reports contain data sections for each"
+            f" proxy. Treat data from these proxy tickers as representative of the"
+            f" fund's performance and characteristics."
+        )
+
     return context
 
 

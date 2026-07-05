@@ -6,20 +6,45 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
     get_stock_data,
     get_verified_market_snapshot,
+    resolve_isin_ticker_list,
 )
 
 
 def create_market_analyst(llm):
 
     def market_analyst_node(state):
+        ticker = state["company_of_interest"]
         current_date = state["trade_date"]
         instrument_context = get_instrument_context_from_state(state)
+
+        symbol_list = resolve_isin_ticker_list(ticker)
+        mapped_tickers = symbol_list[1:] if len(symbol_list) > 1 else []
 
         tools = [
             get_stock_data,
             get_indicators,
             get_verified_market_snapshot,
         ]
+
+        if mapped_tickers:
+            symbols_fmt = ", ".join(f"`{s}`" for s in symbol_list)
+            proxies_fmt = ", ".join(f"`{t}`" for t in mapped_tickers)
+            isin_note = (
+                f"\n\nThis instrument is a fund identified by ISIN `{ticker}`. Its"
+                f" price reflects the fund's Net Asset Value (NAV), computed once per"
+                f" business day — volume will always be zero and volume-based"
+                f" indicators (e.g. VWMA) will be unavailable for the ISIN itself."
+                f" To produce a complete market analysis, retrieve and report data for"
+                f" all of the following symbols: {symbols_fmt}. `{ticker}` is the"
+                f" fund's own NAV price series; {proxies_fmt} are exchange-traded"
+                f" proxy tickers representing the fund's underlying holdings — use"
+                f" these for volume, indicator, and momentum data. Call get_stock_data"
+                f" and get_indicators for each symbol. Clearly label every section of"
+                f" your report with the symbol it covers, then synthesise all data"
+                f" into a unified market analysis of the fund."
+            )
+        else:
+            isin_note = ""
 
         system_message = (
             """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **8 indicators** that provide complementary insights without redundancy. Categories and each category's indicators are:
@@ -51,6 +76,7 @@ Volume-Based Indicators:
 Before writing the final report, call get_verified_market_snapshot for this ticker and the current date, and treat it as the source of truth for any exact OHLCV, price-level, or indicator-value claim. If another tool's output conflicts with the verified snapshot, flag the discrepancy rather than inventing a reconciled number. Do not claim historical validation, support/resistance bounces, or exact percentage moves unless they are directly supported by tool output with concrete dates and prices.
 
 Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
+            + isin_note
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
             + get_language_instruction()
         )

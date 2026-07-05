@@ -7,13 +7,18 @@ from tradingagents.agents.utils.agent_utils import (
     get_income_statement,
     get_instrument_context_from_state,
     get_language_instruction,
+    resolve_isin_ticker_list,
 )
 
 
 def create_fundamentals_analyst(llm):
     def fundamentals_analyst_node(state):
+        ticker = state["company_of_interest"]
         current_date = state["trade_date"]
         instrument_context = get_instrument_context_from_state(state)
+
+        symbol_list = resolve_isin_ticker_list(ticker)
+        mapped_tickers = symbol_list[1:] if len(symbol_list) > 1 else []
 
         tools = [
             get_fundamentals,
@@ -22,11 +27,32 @@ def create_fundamentals_analyst(llm):
             get_income_statement,
         ]
 
+        if mapped_tickers:
+            symbols_fmt = ", ".join(f"`{s}`" for s in symbol_list)
+            proxies_fmt = ", ".join(f"`{t}`" for t in mapped_tickers)
+            isin_note = (
+                f" This instrument is a fund identified by ISIN `{ticker}`."
+                f" Financial statement data (balance sheet, cash flow, income"
+                f" statement) is not available for fund vehicles — only basic market"
+                f" metrics (52-week range, dividend yield, moving averages) will be"
+                f" returned for the ISIN itself. To provide meaningful fundamental"
+                f" analysis, retrieve data for all of the following symbols:"
+                f" {symbols_fmt}. `{ticker}` is the fund's ISIN; {proxies_fmt} are"
+                f" exchange-traded proxy tickers representing the fund's underlying"
+                f" holdings, with full financial statement coverage. Call all available"
+                f" tools for each symbol. Clearly label every section of your report"
+                f" with the ticker it covers. Synthesise all data into a unified"
+                f" fundamental analysis of the fund as a whole."
+            )
+        else:
+            isin_note = ""
+
         system_message = (
             "You are a researcher tasked with analyzing fundamental information over the past year about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
+            + isin_note
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
-            + get_language_instruction(),
+            + get_language_instruction()
         )
 
         prompt = ChatPromptTemplate.from_messages(

@@ -25,7 +25,6 @@ See: https://github.com/TauricResearch/TradingAgents/issues/796
 """
 
 import logging
-import re
 from datetime import datetime, timedelta
 
 from langchain_core.messages import AIMessage
@@ -36,6 +35,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
     get_language_instruction,
     get_news,
+    resolve_isin_ticker_list,
 )
 from tradingagents.agents.utils.structured import (
     bind_structured,
@@ -44,47 +44,7 @@ from tradingagents.agents.utils.structured import (
 from tradingagents.dataflows.reddit import fetch_reddit_posts
 from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
 
-
 logger = logging.getLogger(__name__)
-
-# Matches the standard 12-character ISIN format: 2-letter country code,
-# 9 alphanumeric characters, 1 numeric check digit.
-_ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
-
-
-def _resolve_sentiment_tickers(ticker: str) -> list[str]:
-    """Return the list of tickers to use for sentiment data fetching.
-
-    For ordinary stock/crypto tickers this is simply ``[ticker]``. When the
-    input looks like an ISIN (fund identifier), the function checks
-    ``DEFAULT_CONFIG['isin_ticker_map']`` for a user-defined mapping:
-
-    - If a mapping exists, the mapped tickers are returned so that
-      StockTwits / Reddit / news fetches target symbols people actually
-      discuss on social platforms.
-    - If no mapping exists, a ``WARNING`` is logged and ``[ticker]`` is
-      returned unchanged (the ISIN will typically yield empty results from
-      all three sentiment sources).
-    """
-    if not _ISIN_RE.match(ticker.upper()):
-        return [ticker]
-
-    from tradingagents.dataflows.config import get_config
-
-    isin_map = get_config().get("isin_ticker_map", {})
-    mapped = isin_map.get(ticker.upper()) or isin_map.get(ticker)
-    if mapped:
-        return list(mapped)
-
-    logger.warning(
-        "Sentiment Analyst: %r looks like an ISIN but has no entry in "
-        "DEFAULT_CONFIG['isin_ticker_map']. Searching as-is — results will "
-        "likely be empty. Add a mapping to fix this, e.g. "
-        '"%s": ["TICKER1", "TICKER2"].',
-        ticker,
-        ticker.upper(),
-    )
-    return [ticker]
 
 
 def _fetch_multi_ticker_blocks(
@@ -105,7 +65,10 @@ def _fetch_multi_ticker_blocks(
     reddit_parts: list[str] = []
 
     for t in mapped_tickers:
-        header = f"### {t} (mapped from fund ISIN {isin})"
+        if t.upper() == isin.upper():
+            header = f"### {t} (ISIN — direct fund search)"
+        else:
+            header = f"### {t} (mapped from fund ISIN {isin})"
         news_parts.append(f"{header}\n{get_news.func(t, start_date, end_date)}")
         stocktwits_parts.append(f"{header}\n{fetch_stocktwits_messages(t, limit=30)}")
         reddit_parts.append(f"{header}\n{fetch_reddit_posts(t)}")
@@ -138,11 +101,13 @@ def create_sentiment_analyst(llm):
         instrument_context = get_instrument_context_from_state(state)
 
         # Resolve which ticker(s) to query for sentiment data. For ordinary
-        # tickers this is a no-op ([ticker]). For fund ISINs it returns the
-        # user-configured mapped tickers from isin_ticker_map, or falls back
-        # to [ticker] with a warning when no mapping is found.
-        sentiment_tickers = _resolve_sentiment_tickers(ticker)
-        is_mapped = sentiment_tickers != [ticker]
+        # tickers this is a no-op ([ticker]). For fund ISINs with a mapping,
+        # returns [ISIN, proxy1, proxy2, …] — the ISIN section will typically
+        # show empty social results (correctly signalling that the fund is not
+        # discussed under its ISIN on retail platforms); the proxy sections
+        # carry the actual social signal.
+        sentiment_tickers = resolve_isin_ticker_list(ticker)
+        is_mapped = len(sentiment_tickers) > 1
 
         # Pre-fetch all three sources. Each fetcher degrades gracefully and
         # returns a string (no exceptions surface from here), so the LLM

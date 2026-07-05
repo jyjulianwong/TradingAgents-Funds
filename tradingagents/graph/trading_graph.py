@@ -26,6 +26,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_stock_data,
     get_verified_market_snapshot,
     resolve_instrument_identity,
+    resolve_isin_ticker_list,
 )
 from tradingagents.agents.utils.memory import TradingMemoryLog
 from tradingagents.dataflows.config import set_config
@@ -314,9 +315,16 @@ class TradingAgentsGraph:
         hallucinating one from the price chart (#814). Both the propagate()
         path and the CLI call this so the resolved identity reaches the whole
         graph regardless of entry point.
+
+        When the ticker is a fund ISIN present in ``isin_ticker_map``, the
+        mapped proxy tickers are embedded in the context string so that all
+        downstream agents (researchers, risk debaters, trader, PM) know to
+        treat proxy data in the analyst reports as representative of the fund.
         """
         identity = resolve_instrument_identity(ticker)
-        return build_instrument_context(ticker, asset_type, identity)
+        all_tickers = resolve_isin_ticker_list(ticker)
+        mapped = all_tickers[1:] if len(all_tickers) > 1 else None
+        return build_instrument_context(ticker, asset_type, identity, mapped_tickers=mapped)
 
     def propagate(self, company_name, trade_date, asset_type: str = "stock"):
         """Run the trading agents graph for a company on a specific date.
