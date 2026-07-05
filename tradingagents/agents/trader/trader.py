@@ -31,7 +31,10 @@ def create_trader(llm):
                 "content": (
                     "You are a trading agent analyzing market data to make investment decisions. "
                     "Based on your analysis, provide a specific recommendation to buy, sell, or hold. "
-                    "Anchor your reasoning in the analysts' reports and the research plan."
+                    "Anchor your reasoning in the analysts' reports and the research plan. "
+                    "Evaluate expected forward returns over a one-year investment horizon, prioritising "
+                    "structural, fundamentals-driven drivers of value appreciation or deterioration "
+                    "over near-term technical signals or short-term price momentum."
                     + get_language_instruction()
                 ),
             },

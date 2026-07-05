@@ -33,6 +33,7 @@ Key points to focus on:
 - Negative Indicators: Use evidence from financial data, market trends, or recent adverse news to support your position.
 - Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
 - Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts.
+- Investment Horizon: Frame the bear thesis around a one-year holding period. Emphasise structural headwinds — deteriorating fundamentals, competitive threats, margin compression, or adverse macro shifts — that are expected to erode value over the next twelve months, rather than short-term volatility.
 
 Resources available:
 

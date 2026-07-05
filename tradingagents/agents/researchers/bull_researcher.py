@@ -32,6 +32,7 @@ Key points to focus on:
 - Positive Indicators: Use financial health, industry trends, and recent positive news as evidence.
 - Bear Counterpoints: Critically analyze the bear argument with specific data and sound reasoning, addressing concerns thoroughly and showing why the bull perspective holds stronger merit.
 - Engagement: Present your argument in a conversational style, engaging directly with the bear analyst's points and debating effectively rather than just listing data.
+- Investment Horizon: Frame the bull thesis around a one-year holding period. Emphasise structural catalysts — earnings growth, margin expansion, market share gains, or favourable macro tailwinds — that are expected to drive appreciation over the next twelve months, rather than short-term price momentum.
 
 Resources available:
 {instrument_context}

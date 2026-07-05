@@ -19,6 +19,20 @@ logger = logging.getLogger(__name__)
 # enough to catch the year-old frames yfinance occasionally returns (#1021).
 MAX_OHLCV_STALE_DAYS = 10
 
+# yfinance enforces hard history limits for intraday intervals. Keys are the
+# yfinance interval strings; values are the safe lookback in calendar days.
+# Intervals absent from this map (daily, weekly, monthly) use a 5-year window.
+_INTERVAL_LOOKBACK_DAYS: dict[str, int] = {
+    "1m": 6,
+    "2m": 59,
+    "5m": 59,
+    "15m": 59,
+    "30m": 59,
+    "60m": 728,
+    "90m": 59,
+    "1h": 728,
+}
+
 
 def yf_retry(func, max_retries=3, base_delay=2.0):
     """Execute a yfinance call with exponential backoff on rate limits.
@@ -122,13 +136,19 @@ def _assert_ohlcv_not_stale(
         )
 
 
-def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
+def load_ohlcv(symbol: str, curr_date: str, interval: str | None = None) -> pd.DataFrame:
     """Fetch OHLCV data with caching, filtered to prevent look-ahead bias.
 
-    Downloads 5 years of data up to today and caches per symbol. On
-    subsequent calls the cache is reused. Rows after curr_date are
-    filtered out so backtests never see future prices.
+    Downloads data up to today and caches per symbol+interval. On subsequent
+    calls the cache is reused. Rows after curr_date are filtered out so
+    backtests never see future prices.
+
+    The lookback window is automatically capped to yfinance's hard limits for
+    intraday intervals (e.g. 728 days for 1h, 59 days for 30m).
     """
+    if interval is None:
+        interval = get_config().get("tool_vendors", {}).get("ohlcv_interval", "1d")
+
     # Resolve broker/forex symbols (XAUUSD+ -> GC=F) to Yahoo's convention,
     # then reject values that would escape the cache directory when
     # interpolated into the cache filename (e.g. ``../../tmp/x``).
@@ -138,9 +158,12 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     config = get_config()
     curr_date_dt = pd.to_datetime(curr_date)
 
-    # Cache uses a fixed window (5y to today) so one file per symbol.
     today_date = pd.Timestamp.today()
-    start_date = today_date - pd.DateOffset(years=5)
+    lookback_days = _INTERVAL_LOOKBACK_DAYS.get(interval)
+    if lookback_days is not None:
+        start_date = today_date - pd.Timedelta(days=lookback_days)
+    else:
+        start_date = today_date - pd.DateOffset(years=5)
     start_str = start_date.strftime("%Y-%m-%d")
     # yfinance ``end`` is EXCLUSIVE; request tomorrow so today's row is included
     # when curr_date is the current day (#986). Look-ahead is still prevented by
@@ -148,9 +171,10 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
     end_str = (today_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
 
     os.makedirs(config["data_cache_dir"], exist_ok=True)
+    # Include interval in the filename so different intervals don't share a cache.
     data_file = os.path.join(
         config["data_cache_dir"],
-        f"{safe_symbol}-YFin-data-{start_str}-{end_str}.csv",
+        f"{safe_symbol}-YFin-data-{interval}-{start_str}-{end_str}.csv",
     )
 
     # A cached file may be empty if a prior fetch failed (unknown symbol,
@@ -167,6 +191,7 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
             canonical,
             start=start_str,
             end=end_str,
+            interval=interval,
             multi_level_index=False,
             progress=False,
             auto_adjust=True,
@@ -182,8 +207,10 @@ def load_ohlcv(symbol: str, curr_date: str) -> pd.DataFrame:
 
     data = _clean_dataframe(data)
 
-    # Filter to curr_date to prevent look-ahead bias in backtesting
-    data = data[data["Date"] <= curr_date_dt]
+    # Filter to curr_date to prevent look-ahead bias in backtesting.
+    # Use .dt.normalize() so intraday timestamps (e.g. 09:30:00) on curr_date
+    # are included rather than dropped by a midnight-only comparison.
+    data = data[data["Date"].dt.normalize() <= curr_date_dt.normalize()]
 
     # Reject a stale frame (latest row far older than curr_date) rather than
     # feeding year-old prices into indicators (#1021).

@@ -133,9 +133,15 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
         "prediction_markets": "polymarket",  # Options: polymarket (keyless)
     },
-    # Tool-level configuration (takes precedence over category-level)
+    # Tool-level configuration (takes precedence over category-level).
+    # "ohlcv_interval" sets the candle interval for every OHLCV fetch
+    # (get_stock_data and the indicator data loader). yfinance-style values:
+    #   "1d" (daily, default), "1wk" (weekly), "1mo" (monthly)
+    #   "1h" (hourly, ≤730 days history), "30m", "15m", "5m", "2m", "1m"
+    # Note: Alpha Vantage only supports "1d", "1wk", and "1mo".
     "tool_vendors": {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
+        "ohlcv_interval": "1d",
     },
     # Benchmark for alpha calculation in the reflection layer.
     # ``benchmark_ticker`` (when set) overrides the suffix map for all
