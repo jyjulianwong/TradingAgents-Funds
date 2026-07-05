@@ -12,7 +12,6 @@ from tradingagents.agents.utils.agent_utils import (
 
 
 def create_market_analyst(llm):
-
     def market_analyst_node(state):
         ticker = state["company_of_interest"]
         current_date = state["trade_date"]
@@ -30,6 +29,7 @@ def create_market_analyst(llm):
         if mapped_tickers:
             symbols_fmt = ", ".join(f"`{s}`" for s in symbol_list)
             proxies_fmt = ", ".join(f"`{t}`" for t in mapped_tickers)
+            # TODO: Hotfix #0002
             isin_note = (
                 f"\n\nThis instrument is a fund identified by ISIN `{ticker}`. Its"
                 f" price reflects the fund's Net Asset Value (NAV), computed once per"
@@ -39,13 +39,13 @@ def create_market_analyst(llm):
                 f" all of the following symbols: {symbols_fmt}. `{ticker}` is the"
                 f" fund's own NAV price series; {proxies_fmt} are exchange-traded"
                 f" proxy tickers representing the fund's underlying holdings — use"
-                f" these for volume, indicator, and momentum data. You MUST call get_stock_data"  # TODO: Hotfix #0002: Begins
-                f" AND get_indicators individually for EVERY symbol in this list: "
-                f" {symbols_fmt}. Do not skip any symbol or substitute a "
-                f" get_indicators call with the verified snapshot for any symbol — "
-                f" the verified snapshot is a cross-check only. Clearly label every section of"  # TODO: Hotfix #0002: Ends
-                f" your report with the symbol it covers, then synthesise all data"
-                f" into a unified market analysis of the fund."
+                f" these for volume, indicator, and momentum data. You MUST call"
+                f" get_stock_data AND get_indicators individually for EVERY symbol in"
+                f" this list: {symbols_fmt}. Do not skip any symbol or substitute a"
+                f" get_indicators call with the verified snapshot for any symbol —"
+                f" the verified snapshot is a cross-check only. Clearly label every"
+                f" section of your report with the symbol it covers, then synthesise"
+                f" all data into a unified market analysis of the fund."
             )
         else:
             isin_note = ""
