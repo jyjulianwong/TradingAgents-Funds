@@ -17,6 +17,7 @@ Log format (one object per line):
 """
 
 import asyncio
+import contextlib
 import datetime
 import json
 import pathlib
@@ -127,10 +128,8 @@ def emit(event: dict[str, Any]) -> None:
 def _broadcast_in_loop(event: dict[str, Any]) -> None:
     """Called inside the FastAPI asyncio event loop to fanout to all WS queues."""
     for q in list(_ws_queues):
-        try:
+        with contextlib.suppress(asyncio.QueueFull):
             q.put_nowait(event)
-        except asyncio.QueueFull:
-            pass
 
 
 def subscribe() -> asyncio.Queue:
@@ -140,7 +139,5 @@ def subscribe() -> asyncio.Queue:
 
 
 def unsubscribe(q: asyncio.Queue) -> None:
-    try:
+    with contextlib.suppress(ValueError):
         _ws_queues.remove(q)
-    except ValueError:
-        pass

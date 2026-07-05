@@ -28,7 +28,6 @@ import sys
 import time
 import webbrowser
 
-
 # ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
 _NO_COLOR = not sys.stdout.isatty()
@@ -36,12 +35,12 @@ _NO_COLOR = not sys.stdout.isatty()
 def _c(code, text):
     return text if _NO_COLOR else f"\033[{code}m{text}\033[0m"
 
-dim    = lambda t: _c("2",   t)
-bold   = lambda t: _c("1",   t)
-green  = lambda t: _c("92",  t)
-red    = lambda t: _c("91",  t)
-yellow = lambda t: _c("93",  t)
-cyan   = lambda t: _c("96",  t)
+def dim(t):    return _c("2",  t)
+def bold(t):   return _c("1",  t)
+def green(t):  return _c("92", t)
+def red(t):    return _c("91", t)
+def yellow(t): return _c("93", t)
+def cyan(t):   return _c("96", t)
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -132,10 +131,10 @@ def main() -> None:
             "Market Analyst", 5.5, "Fetching OHLCV, computing RSI/MACD/BB…",
             [
                 (1.2, f"Fetching 365 days of OHLCV data for {ticker}…\nRetrieved daily bars from Yahoo Finance."),
-                (2.5, f"RSI(14): 67.3 — approaching overbought territory\n"
-                      f"MACD: 2.45 > signal 1.87, bullish crossover confirmed\n"
-                      f"Bollinger Bands: price at upper band (+1.9σ)\n"
-                      f"Volume: +34% above 20-day average on breakout session"),
+                (2.5, "RSI(14): 67.3 — approaching overbought territory\n"
+                      "MACD: 2.45 > signal 1.87, bullish crossover confirmed\n"
+                      "Bollinger Bands: price at upper band (+1.9σ)\n"
+                      "Volume: +34% above 20-day average on breakout session"),
                 (4.2, f"Technical summary for {ticker}: Momentum indicators are bullish "
                       f"with RSI trending upward but not yet in overbought territory. "
                       f"MACD crossover suggests continuation of the current uptrend. "
@@ -159,12 +158,12 @@ def main() -> None:
                 (1.3, f"Scanning news headlines for {ticker} (last 7 days)…\n"
                       f"Fetching FRED macro indicators: Fed Funds Rate, CPI, GDP…\n"
                       f"Querying Polymarket for relevant prediction markets…"),
-                (3.5, f"Key news events:\n"
-                      f"  • Earnings beat: EPS $5.16 vs. $4.59 consensus (+12.4%)\n"
-                      f"  • New data-centre partnership announced with major hyperscaler\n"
-                      f"  • Morgan Stanley raises PT to $950; reiterates Overweight\n\n"
-                      f"Macro context: Fed held rates steady; CPI softening to 3.1% YoY. "
-                      f"Risk-on environment supportive of growth equities."),
+                (3.5, "Key news events:\n"
+                      "  • Earnings beat: EPS $5.16 vs. $4.59 consensus (+12.4%)\n"
+                      "  • New data-centre partnership announced with major hyperscaler\n"
+                      "  • Morgan Stanley raises PT to $950; reiterates Overweight\n\n"
+                      "Macro context: Fed held rates steady; CPI softening to 3.1% YoY. "
+                      "Risk-on environment supportive of growth equities."),
             ],
         ),
         (
@@ -216,10 +215,10 @@ def main() -> None:
     activate("Research Manager")
     wait(1.2, "Synthesising bull/bear arguments into a verdict…")
     message("Research Manager",
-            f"Verdict: The bull case prevails on a 12-month horizon. Revenue growth and "
-            f"margin expansion outweigh near-term valuation concerns. Export risk is real "
-            f"but management has demonstrated supply-chain agility. Recommend LONG with "
-            f"a stop-loss at the 50-day SMA. Risk/reward favours buyers at current levels.")
+            "Verdict: The bull case prevails on a 12-month horizon. Revenue growth and "
+            "margin expansion outweigh near-term valuation concerns. Export risk is real "
+            "but management has demonstrated supply-chain agility. Recommend LONG with "
+            "a stop-loss at the 50-day SMA. Risk/reward favours buyers at current levels.")
     wait(1.3)
 
     # ── Trading desk ──────────────────────────────────────────────────────────
@@ -241,21 +240,21 @@ def main() -> None:
     print(f"\n  {dim('── Risk Management')} ({rounds} round{'s' if rounds > 1 else ''}) {'─'*25}")
     risk_specs = [
         ("Aggressive Analyst",   1.8, "Stress-testing upside scenario…",
-         f"Upside scenario: AI adoption accelerates beyond consensus. "
-         f"Data-centre spend from hyperscalers could push revenues to $60B+ next year. "
-         f"Recommend a 3.5% position — the asymmetric payoff justifies above-average sizing."),
+         "Upside scenario: AI adoption accelerates beyond consensus. "
+         "Data-centre spend from hyperscalers could push revenues to $60B+ next year. "
+         "Recommend a 3.5% position — the asymmetric payoff justifies above-average sizing."),
         ("Conservative Analyst", 1.8, "Evaluating tail risks & drawdown…",
-         f"Tail-risk assessment: A 20-25% China revenue headwind from export controls "
-         f"represents the primary downside. Elevated valuation leaves little margin of "
-         f"safety. Cap position at 1.5% of AUM; set stop-loss firmly at 50-day SMA."),
+         "Tail-risk assessment: A 20-25% China revenue headwind from export controls "
+         "represents the primary downside. Elevated valuation leaves little margin of "
+         "safety. Cap position at 1.5% of AUM; set stop-loss firmly at 50-day SMA."),
         ("Neutral Analyst",      1.8, "Balancing risk vs reward…",
-         f"Balanced view: Fundamental thesis is solid but near-term catalysts are largely "
-         f"priced in. A 2.5% position with a trailing stop balances participation in the "
-         f"AI upcycle with prudent downside protection. Review on next earnings release."),
+         "Balanced view: Fundamental thesis is solid but near-term catalysts are largely "
+         "priced in. A 2.5% position with a trailing stop balances participation in the "
+         "AI upcycle with prudent downside protection. Review on next earnings release."),
     ]
     for rnd in range(1, rounds + 1):
         print(dim(f"    Round {rnd}:"))
-        for agent, dur, note, msg_text in risk_specs:
+        for agent, _dur, note, msg_text in risk_specs:
             activate(agent)
             wait(0.9, note)
             message(agent, f"[Round {rnd}] " + msg_text)
@@ -277,9 +276,9 @@ def main() -> None:
 
     # ── Completion ────────────────────────────────────────────────────────────
     sig_display = {
-        "BUY":  green(f"★  BUY  ★"),
-        "SELL": red(  f"★  SELL  ★"),
-        "HOLD": yellow(f"★  HOLD  ★"),
+        "BUY":  green("★  BUY  ★"),
+        "SELL": red(  "★  SELL  ★"),
+        "HOLD": yellow("★  HOLD  ★"),
     }.get(signal, bold(signal))
     print(f"\n  {dim('── Complete')} {'─'*41}")
     print(f"  {sig_display}  ({ticker})")
