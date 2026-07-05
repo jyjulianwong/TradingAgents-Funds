@@ -19,8 +19,8 @@ from rich.table import Table
 from rich.text import Text
 
 from cli.announcements import display_announcements, fetch_announcements
-from cli.stats_handler import StatsCallbackHandler
 from cli.models import AnalystType
+from cli.stats_handler import StatsCallbackHandler
 from cli.utils import (
     ask_anthropic_effort,
     ask_gemini_thinking_config,
@@ -1018,9 +1018,9 @@ def run_analysis(checkpoint: bool | None = None):
     # Start the 3-D visualizer server and open a browser tab.
     _viz_bridge = None
     try:
-        from visualizer import bridge as _vb
-        from visualizer import server as _vs
         import webbrowser
+
+        from visualizer import bridge as _vb, server as _vs
         _viz_port = _vs.start()
         webbrowser.open_new_tab(f"http://127.0.0.1:{_viz_port}")
         _viz_bridge = _vb
