@@ -1,6 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.utils.agent_utils import (
+    get_autonomous_agent_instruction,
     get_indicators,
     get_instrument_context_from_state,
     get_language_instruction,
@@ -38,8 +39,11 @@ def create_market_analyst(llm):
                 f" all of the following symbols: {symbols_fmt}. `{ticker}` is the"
                 f" fund's own NAV price series; {proxies_fmt} are exchange-traded"
                 f" proxy tickers representing the fund's underlying holdings — use"
-                f" these for volume, indicator, and momentum data. Call get_stock_data"
-                f" and get_indicators for each symbol. Clearly label every section of"
+                f" these for volume, indicator, and momentum data. You MUST call get_stock_data"  # TODO: Hotfix #0002: Begins
+                f" AND get_indicators individually for EVERY symbol in this list: "
+                f" {symbols_fmt}. Do not skip any symbol or substitute a "
+                f" get_indicators call with the verified snapshot for any symbol — "
+                f" the verified snapshot is a cross-check only. Clearly label every section of"  # TODO: Hotfix #0002: Ends
                 f" your report with the symbol it covers, then synthesise all data"
                 f" into a unified market analysis of the fund."
             )
@@ -77,7 +81,9 @@ Before writing the final report, call get_verified_market_snapshot for this tick
 
 Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
             + isin_note
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
+            + " When calling get_stock_data, default to the '1d' interval unless the data clearly warrants a different granularity."  # TODO: Hotfix #0001
+            + get_autonomous_agent_instruction()  # TODO: Hotfix #0001
             + get_language_instruction()
         )
 

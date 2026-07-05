@@ -1,6 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.utils.agent_utils import (
+    get_autonomous_agent_instruction,
     get_balance_sheet,
     get_cashflow,
     get_fundamentals,
@@ -52,6 +53,7 @@ def create_fundamentals_analyst(llm):
             + isin_note
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
+            + get_autonomous_agent_instruction()  # TODO: Hotfix #0001
             + get_language_instruction()
         )
 

@@ -32,6 +32,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.schemas import SentimentReport, render_sentiment_report
 from tradingagents.agents.utils.agent_utils import (
+    get_autonomous_agent_instruction,
     get_instrument_context_from_state,
     get_language_instruction,
     get_news,
@@ -254,7 +255,7 @@ Fill the following fields:
 - **confidence**: low / medium / high, based on data quality and sample size.
 - **narrative**: Full source-by-source breakdown, divergences, dominant narrative themes, catalysts and risks, and a markdown summary table of key sentiment signals (direction, source, supporting evidence).
 
-{get_language_instruction()}"""
+{get_autonomous_agent_instruction()}{get_language_instruction()}"""  # TODO: Hotfix #0001
 
 
 # ---------------------------------------------------------------------------

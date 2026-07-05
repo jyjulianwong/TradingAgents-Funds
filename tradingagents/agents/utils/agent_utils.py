@@ -45,6 +45,7 @@ __all__ = [
     "resolve_isin_ticker_list",
     "get_instrument_context_from_state",
     "get_language_instruction",
+    "get_autonomous_agent_instruction",  # TODO: Hotfix #0001
     "create_msg_delete",
 ]
 
@@ -91,6 +92,21 @@ def resolve_isin_ticker_list(ticker: str) -> list[str]:
         ticker.upper(),
     )
     return [ticker]
+
+
+# TODO: Hotfix #0001
+def get_autonomous_agent_instruction() -> str:
+    """Return a prompt instruction reminding tool-calling agents to proceed autonomously.
+
+    Prevents the LLM from stalling the tool-calling loop by emitting a
+    user-facing question on its first turn.  Appended to every analyst's
+    system message alongside ``get_language_instruction()``.
+    """
+    return (
+        " You are operating in a fully automated pipeline with no human in the loop."
+        " Never ask the user for clarification or additional input."
+        " If any parameter is ambiguous, choose the most sensible default and proceed immediately with the tool calls suggested in the system message."
+    )
 
 
 def get_language_instruction() -> str:
