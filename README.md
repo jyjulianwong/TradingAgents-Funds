@@ -1,3 +1,63 @@
+# TradingAgents for Investment Funds — Python Library Extension
+
+> This is a fork of [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) extended to support OEIC / mutual fund analysis via proxy holdings.
+
+## What this fork adds
+
+Vanilla TradingAgents is built around exchange-listed tickers (`AAPL`, `BTC-USD`, `7203.T`, etc.) — instruments that have live price feeds, social media presence, and financial statement coverage. Mutual funds identified by ISINs (e.g. `GB00B56FW078`) don't fit this mould: they have no exchange-traded price, no StockTwits cashtag, and no income statement on Yahoo Finance.
+
+This extension bridges that gap. The approach:
+
+1. **Look up the fund's top holdings.** For each fund ISIN, a manually-curated mapping in `DEFAULT_CONFIG["isin_ticker_map"]` records the fund's largest constituent holdings (or a liquid ETF proxy for index funds), sourced from fund factsheets and platforms such as Morningstar, Hargreaves Lansdown, and the fund manager's own website. The intent is that these proxy tickers capture the same sector exposure and macro sensitivity as the fund itself.
+
+2. **Run the full TradingAgents pipeline on the proxy tickers.** When you pass a fund ISIN as the ticker, `resolve_isin_ticker_list()` expands it to `[ISIN] + [proxy_tickers]`. Each analyst then queries all symbols in the list:
+   - The **Market Analyst** fetches OHLCV data and technical indicators (`RSI`, `MACD`, Bollinger Bands, etc.) for every proxy ticker, building a consolidated picture of recent price action.
+   - The **Sentiment Analyst** collects news headlines, StockTwits messages, and Reddit posts for the proxy tickers (the ISIN itself returns empty results on social platforms, which is correctly reported rather than fabricated).
+   - The **News Analyst** gathers macro news and sector developments relevant to the proxy holdings.
+   - The **Fundamentals Analyst** pulls financial statements and valuation metrics for each proxy company.
+
+3. **Synthesise a fund-level view.** The downstream agents (Bull/Bear Researchers, Research Manager, Trader, Risk Debaters, Portfolio Manager) receive all analyst reports with explicit context that the proxy data is representative of the fund. The Portfolio Manager issues the same five-tier rating (`Buy / Overweight / Hold / Underweight / Sell`) as for any other instrument.
+
+## Adding a new fund
+
+Find the fund's top holdings from its factsheet or a fund data platform, then add an entry to `DEFAULT_CONFIG["isin_ticker_map"]` in `tradingagents/default_config.py`:
+
+```python
+"isin_ticker_map": {
+    # ...existing entries...
+    "GB00XXXXXXXX": ["TICK1", "TICK2", "TICK3"],  # Fund Name (source of holdings)
+}
+```
+
+Then, run the analysis as usual, passing the ISIN as the ticker:
+
+```bash
+tradingagents analyze   # enter the ISIN when prompted for a ticker
+```
+
+```python
+from tradingagents.graph.trading_graph import TradingAgentsGraph
+from tradingagents.default_config import DEFAULT_CONFIG
+
+ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
+_, decision = ta.propagate("GB00XXXXXXXX", "2026-07-13")
+print(decision)
+```
+
+If the ISIN has no entry in `isin_ticker_map`, a warning is logged and the raw ISIN is queried as-is (which will return sparse data from most sources).
+
+## Limitations
+
+- Proxy holdings are a snapshot in time. Fund compositions change; the mapping must be updated manually to stay current.
+- Technical signals and sentiment belong to the individual holdings, not the fund NAV directly. The analysis is an indirect read — directionally useful, not a precise NAV forecast.
+- Funds with very diffuse holdings (hundreds of equally-weighted positions) are poorly served by a three-ticker proxy. Index-tracking funds map better to a single liquid ETF that tracks the same benchmark.
+
+---
+
+*Everything below is the original TradingAgents README.*
+
+---
+
 <p align="center">
   <img src="assets/TauricResearch.png" style="width: 60%; height: auto;">
 </p>
