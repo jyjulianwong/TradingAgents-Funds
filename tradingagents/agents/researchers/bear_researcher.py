@@ -1,4 +1,5 @@
 from tradingagents.agents.utils.agent_utils import (
+    get_fund_analysis_instruction,
     get_instrument_context_from_state,
     get_language_instruction,
 )
@@ -6,6 +7,7 @@ from tradingagents.agents.utils.agent_utils import (
 
 def create_bear_researcher(llm):
     def bear_node(state) -> dict:
+        ticker = state["company_of_interest"]
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
         bear_history = investment_debate_state.get("bear_history", "")
@@ -24,7 +26,8 @@ def create_bear_researcher(llm):
             else "Asset fundamentals report (may be unavailable for crypto)"
         )
 
-        prompt = f"""You are a Bear Analyst making the case against investing in the {target_label}. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
+        prompt = (
+            f"""You are a Bear Analyst making the case against investing in the {target_label}. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
 
 Key points to focus on:
 
@@ -45,7 +48,10 @@ Latest world affairs news: {news_report}
 Conversation history of the debate: {history}
 Last bull argument: {current_response}
 Use this information to deliver a compelling bear argument, refute the bull's claims, and engage in a dynamic debate that demonstrates the risks and weaknesses of investing in the {target_label}.
-""" + get_language_instruction()
+"""
+            + get_fund_analysis_instruction(ticker)
+            + get_language_instruction()
+        )
 
         response = llm.invoke(prompt)
 

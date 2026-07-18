@@ -2,6 +2,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from tradingagents.agents.utils.agent_utils import (
     get_autonomous_agent_instruction,
+    get_fund_analysis_instruction,
     get_indicators,
     get_instrument_context_from_state,
     get_language_instruction,
@@ -50,6 +51,8 @@ def create_market_analyst(llm):
         else:
             isin_note = ""
 
+        fund_note = get_fund_analysis_instruction(ticker)
+
         system_message = (
             """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **8 indicators** that provide complementary insights without redundancy. Categories and each category's indicators are:
 
@@ -81,6 +84,7 @@ Before writing the final report, call get_verified_market_snapshot for this tick
 
 Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
             + isin_note
+            + fund_note
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " When calling get_stock_data, default to the '1d' interval unless the data clearly warrants a different granularity."  # TODO: Hotfix #0001
             + get_autonomous_agent_instruction()  # TODO: Hotfix #0001

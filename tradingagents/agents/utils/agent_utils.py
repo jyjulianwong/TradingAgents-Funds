@@ -44,6 +44,7 @@ __all__ = [
     "resolve_instrument_identity",
     "resolve_isin_ticker_list",
     "get_instrument_context_from_state",
+    "get_fund_analysis_instruction",
     "get_language_instruction",
     "get_autonomous_agent_instruction",  # TODO: Hotfix #0001
     "create_msg_delete",
@@ -87,11 +88,67 @@ def resolve_isin_ticker_list(ticker: str) -> list[str]:
         "resolve_isin_ticker_list: %r looks like an ISIN but has no entry in "
         "DEFAULT_CONFIG['isin_ticker_map']. Only the ISIN itself will be queried "
         "— volume and financial-statement data will likely be unavailable. "
-        "Add a mapping to fix this, e.g. \"%s\": [\"TICKER1\", \"TICKER2\"].",
+        'Add a mapping to fix this, e.g. "%s": ["TICKER1", "TICKER2"].',
         ticker,
         ticker.upper(),
     )
     return [ticker]
+
+
+def get_fund_analysis_instruction(ticker: str) -> str:
+    """Return fund-specific prompt instructions when *ticker* is an ISIN.
+
+    Returns an empty string for non-ISIN tickers so it is safe to
+    unconditionally append to any agent prompt.  When the ticker is an ISIN,
+    the returned text corrects LLM misconceptions about UK open-ended
+    investment companies (OEICs) / unit trusts that otherwise skew ratings
+    toward SELL/UNDERWEIGHT due to structural data artefacts:
+
+    - Zero trading volume on the ISIN is normal (NAV-priced, not exchange-traded)
+      and must not be used as a liquidity or execution-risk signal.
+    - Stop-loss orders, bid-ask spread, and slippage are inapplicable.
+    - Missing corporate financial statements are expected for fund vehicles.
+    - PE benchmarks should match the fund's underlying index, not a generic norm.
+    - Proxy-ticker risks should inform sector/market context, not be imported as
+      fund-level idiosyncratic risks.
+    """
+    if not _ISIN_RE.match(ticker.strip().upper()):
+        return ""
+
+    mapped = resolve_isin_ticker_list(ticker)
+    proxy_tickers = mapped[1:]
+    proxy_note = (
+        (
+            f" When proxy tickers ({', '.join(proxy_tickers)}) appear in the reports,"
+            " use them for sector and market context only — do not attribute"
+            " individual-stock risks (e.g. a single company's regulatory probe or"
+            " earnings miss) directly to the diversified fund vehicle."
+        )
+        if proxy_tickers
+        else ""
+    )
+
+    return (
+        "\n\n**FUND INSTRUMENT NOTICE — this ticker is a UK OEIC / unit trust:**"
+        " The following are structural characteristics of this instrument type,"
+        " not warning signs. Factor them into your analysis accordingly."
+        "\n- **Zero trading volume is normal and must not be used as a negative"
+        " signal.** OEICs do not trade on a secondary exchange; investors subscribe"
+        " and redeem directly through the fund manager at the next published NAV."
+        " Zero volume does NOT indicate illiquidity, an untradeable asset, or"
+        " execution risk."
+        "\n- **Stop-loss orders, slippage, and bid-ask spread are inapplicable.**"
+        " Redemptions settle at the next available NAV price (typically T+3"
+        " business days). Risk management relies on allocation sizing and NAV"
+        " discount monitoring, not exchange-order mechanics."
+        "\n- **Missing income statements, balance sheets, and cash-flow statements"
+        " are expected.** Fund vehicles publish NAV, factsheets, and portfolio"
+        " holdings rather than corporate financial accounts."
+        "\n- **Use an index-appropriate PE benchmark.** For a fund tracking the"
+        " S&P 500, compare its PE to the historical S&P 500 PE range"
+        " (approximately 18–28× in recent market cycles), not to a generic"
+        " single-stock norm of 16-20x." + proxy_note
+    )
 
 
 # TODO: Hotfix #0001
@@ -119,6 +176,7 @@ def get_language_instruction() -> str:
     report rather than a mix of languages.
     """
     from tradingagents.dataflows.config import get_config
+
     lang = get_config().get("output_language", "English")
     if lang.strip().lower() == "english":
         return ""
@@ -291,6 +349,3 @@ def create_msg_delete():
         return {"messages": removal_operations + [placeholder]}
 
     return delete_messages
-
-
-

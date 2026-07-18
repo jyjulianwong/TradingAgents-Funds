@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage
 
 from tradingagents.agents.schemas import TraderProposal, render_trader_proposal
 from tradingagents.agents.utils.agent_utils import (
+    get_fund_analysis_instruction,
     get_instrument_context_from_state,
     get_language_instruction,
 )
@@ -37,6 +38,7 @@ def create_trader(llm):
                     "structural, fundamentals-driven drivers of value appreciation or deterioration "
                     "over near-term technical signals or short-term price momentum. "
                     + NO_EXTERNAL_TOOLS
+                    + get_fund_analysis_instruction(company_name)
                     + get_language_instruction()
                 ),
             },
