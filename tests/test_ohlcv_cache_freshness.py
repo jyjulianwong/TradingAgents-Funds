@@ -6,6 +6,7 @@ analysis. Two cases matter for a current-day request: the bar may be missing, or
 present but still in progress (Yahoo publishes a partial daily candle intraday).
 Refresh is bounded by a TTL so repeated runs cannot hammer the vendor.
 """
+
 from __future__ import annotations
 
 import os
@@ -70,7 +71,7 @@ def test_load_ohlcv_refetches_stale_same_day_cache(tmp_path, monkeypatch):
     # Pre-seed the cache file load_ohlcv will look for, aged past the TTL.
     start = (TODAY - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
     end = (TODAY + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-    cache_file = tmp_path / f"AAPL-YFin-data-{start}-{end}.csv"
+    cache_file = tmp_path / f"AAPL-YFin-data-1d-{start}-{end}.csv"
     pd.DataFrame({"Date": ["2026-07-17"], "Close": [100.0]}).to_csv(cache_file, index=False)
     old = time.time() - STALE
     os.utime(cache_file, (old, old))
@@ -99,7 +100,7 @@ def test_load_ohlcv_reuses_fresh_same_day_cache(tmp_path, monkeypatch):
 
     start = (TODAY - pd.DateOffset(years=5)).strftime("%Y-%m-%d")
     end = (TODAY + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-    cache_file = tmp_path / f"AAPL-YFin-data-{start}-{end}.csv"
+    cache_file = tmp_path / f"AAPL-YFin-data-1d-{start}-{end}.csv"
     pd.DataFrame({"Date": ["2026-07-18"], "Close": [100.0]}).to_csv(cache_file, index=False)
 
     def _fail_download(*a, **k):
