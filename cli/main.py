@@ -1,5 +1,6 @@
 import datetime
 import os
+import sys
 import time
 from collections import deque
 from functools import wraps
@@ -53,6 +54,18 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.reporting import write_report_tree
 
 console = Console()
+
+# prompt_toolkit's win32 output module is importable only on Windows (it asserts
+# the platform at import time), so gate on the platform rather than catching the
+# failure — that way a genuinely broken prompt_toolkit on Windows still surfaces
+# instead of silently disabling the handler below. Off Windows this stays an
+# empty tuple, which `except` accepts and never matches (#1138).
+if sys.platform == "win32":  # pragma: no cover - platform dependent
+    from prompt_toolkit.output.win32 import NoConsoleScreenBufferError
+
+    _NO_CONSOLE_ERRORS: tuple[type[BaseException], ...] = (NoConsoleScreenBufferError,)
+else:
+    _NO_CONSOLE_ERRORS = ()
 
 app = typer.Typer(
     name="TradingAgents",
@@ -199,9 +212,7 @@ class MessageBuffer:
                 "trader_investment_plan": "Trading Team Plan",
                 "final_trade_decision": "Portfolio Management Decision",
             }
-            self.current_report = (
-                f"### {section_titles[latest_section]}\n{latest_content}"
-            )
+            self.current_report = f"### {section_titles[latest_section]}\n{latest_content}"
 
         # Update the final complete report
         self._update_final_report()
@@ -210,21 +221,22 @@ class MessageBuffer:
         report_parts = []
 
         # Analyst Team Reports - use .get() to handle missing sections
-        analyst_sections = ["market_report", "sentiment_report", "news_report", "fundamentals_report"]
+        analyst_sections = [
+            "market_report",
+            "sentiment_report",
+            "news_report",
+            "fundamentals_report",
+        ]
         if any(self.report_sections.get(section) for section in analyst_sections):
             report_parts.append("## Analyst Team Reports")
             if self.report_sections.get("market_report"):
-                report_parts.append(
-                    f"### Market Analysis\n{self.report_sections['market_report']}"
-                )
+                report_parts.append(f"### Market Analysis\n{self.report_sections['market_report']}")
             if self.report_sections.get("sentiment_report"):
                 report_parts.append(
                     f"### Social Sentiment\n{self.report_sections['sentiment_report']}"
                 )
             if self.report_sections.get("news_report"):
-                report_parts.append(
-                    f"### News Analysis\n{self.report_sections['news_report']}"
-                )
+                report_parts.append(f"### News Analysis\n{self.report_sections['news_report']}")
             if self.report_sections.get("fundamentals_report"):
                 report_parts.append(
                     f"### Fundamentals Analysis\n{self.report_sections['fundamentals_report']}"
@@ -258,19 +270,15 @@ def create_layout():
         Layout(name="main"),
         Layout(name="footer", size=3),
     )
-    layout["main"].split_column(
-        Layout(name="upper", ratio=3), Layout(name="analysis", ratio=5)
-    )
-    layout["upper"].split_row(
-        Layout(name="progress", ratio=2), Layout(name="messages", ratio=3)
-    )
+    layout["main"].split_column(Layout(name="upper", ratio=3), Layout(name="analysis", ratio=5))
+    layout["upper"].split_row(Layout(name="progress", ratio=2), Layout(name="messages", ratio=3))
     return layout
 
 
 def format_tokens(n):
     """Format token count for display."""
     if n >= 1000:
-        return f"{n/1000:.1f}k"
+        return f"{n / 1000:.1f}k"
     return str(n)
 
 
@@ -327,9 +335,7 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
         first_agent = agents[0]
         status = message_buffer.agent_status.get(first_agent, "pending")
         if status == "in_progress":
-            spinner = Spinner(
-                "dots", text="[blue]in_progress[/blue]", style="bold cyan"
-            )
+            spinner = Spinner("dots", text="[blue]in_progress[/blue]", style="bold cyan")
             status_cell = spinner
         else:
             status_color = {
@@ -344,9 +350,7 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
         for agent in agents[1:]:
             status = message_buffer.agent_status.get(agent, "pending")
             if status == "in_progress":
-                spinner = Spinner(
-                    "dots", text="[blue]in_progress[/blue]", style="bold cyan"
-                )
+                spinner = Spinner("dots", text="[blue]in_progress[/blue]", style="bold cyan")
                 status_cell = spinner
             else:
                 status_color = {
@@ -492,9 +496,7 @@ def get_user_selections():
     welcome_content += "[bold green]TradingAgents: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
     welcome_content += "[bold]Workflow Steps:[/bold]\n"
     welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
-    welcome_content += (
-        "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
-    )
+    welcome_content += "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
 
     # Create and center the welcome box
     welcome_box = Panel(
@@ -547,9 +549,7 @@ def get_user_selections():
     # Only announce when it's not the default stock path, to avoid printing
     # "stock" on every run.
     if asset_type.value != "stock":
-        console.print(
-            f"[green]Detected asset type:[/green] {asset_type.value}"
-        )
+        console.print(f"[green]Detected asset type:[/green] {asset_type.value}")
 
     # Step 2: Analysis date (skipped when set via TRADINGAGENTS_ANALYSIS_DATE)
     if DEFAULT_CONFIG.get("analysis_date"):
@@ -569,14 +569,12 @@ def get_user_selections():
     # Step 3: Output language (skipped when set via TRADINGAGENTS_OUTPUT_LANGUAGE)
     if os.environ.get("TRADINGAGENTS_OUTPUT_LANGUAGE"):
         output_language = DEFAULT_CONFIG["output_language"]
-        console.print(
-            f"[green]✓ Output language from environment:[/green] {output_language}"
-        )
+        console.print(f"[green]✓ Output language from environment:[/green] {output_language}")
     else:
         console.print(
             create_question_box(
                 "Step 3: Output Language",
-                "Select the language for analyst reports and final decision"
+                "Select the language for analyst reports and final decision",
             )
         )
         output_language = ask_output_language()
@@ -628,9 +626,7 @@ def get_user_selections():
         )
     else:
         console.print(
-            create_question_box(
-                "Step 5: Research Depth", "Select your research depth level"
-            )
+            create_question_box("Step 5: Research Depth", "Select your research depth level")
         )
         selected_research_depth = select_research_depth()
 
@@ -649,11 +645,7 @@ def get_user_selections():
         # Still confirm/persist the API key so the run doesn't fail later.
         ensure_api_key(selected_llm_provider)
     else:
-        console.print(
-            create_question_box(
-                "Step 6: LLM Provider", "Select your LLM provider"
-            )
-        )
+        console.print(create_question_box("Step 6: LLM Provider", "Select your LLM provider"))
         selected_llm_provider, backend_url = select_llm_provider()
 
         # Providers with regional endpoints prompt for the region as a secondary
@@ -688,7 +680,9 @@ def get_user_selections():
         ensure_api_key(selected_llm_provider)
 
     # Step 7: Thinking agents (skipped when either model is set via environment)
-    if os.environ.get("TRADINGAGENTS_QUICK_THINK_LLM") or os.environ.get("TRADINGAGENTS_DEEP_THINK_LLM"):
+    if os.environ.get("TRADINGAGENTS_QUICK_THINK_LLM") or os.environ.get(
+        "TRADINGAGENTS_DEEP_THINK_LLM"
+    ):
         selected_shallow_thinker = DEFAULT_CONFIG["quick_think_llm"]
         selected_deep_thinker = DEFAULT_CONFIG["deep_think_llm"]
         console.print(
@@ -720,21 +714,30 @@ def get_user_selections():
         anthropic_effort = DEFAULT_CONFIG["anthropic_effort"]
     elif provider_lower == "google":
         thinking_level = thinking_value_or_prompt(
-            "TRADINGAGENTS_GOOGLE_THINKING_LEVEL", "google_thinking_level",
-            "Gemini thinking mode", "Step 8: Thinking Mode",
-            "Configure Gemini thinking mode", ask_gemini_thinking_config,
+            "TRADINGAGENTS_GOOGLE_THINKING_LEVEL",
+            "google_thinking_level",
+            "Gemini thinking mode",
+            "Step 8: Thinking Mode",
+            "Configure Gemini thinking mode",
+            ask_gemini_thinking_config,
         )
     elif provider_lower == "openai":
         reasoning_effort = thinking_value_or_prompt(
-            "TRADINGAGENTS_OPENAI_REASONING_EFFORT", "openai_reasoning_effort",
-            "Reasoning effort", "Step 8: Reasoning Effort",
-            "Configure OpenAI reasoning effort level", ask_openai_reasoning_effort,
+            "TRADINGAGENTS_OPENAI_REASONING_EFFORT",
+            "openai_reasoning_effort",
+            "Reasoning effort",
+            "Step 8: Reasoning Effort",
+            "Configure OpenAI reasoning effort level",
+            ask_openai_reasoning_effort,
         )
     elif provider_lower == "anthropic":
         anthropic_effort = thinking_value_or_prompt(
-            "TRADINGAGENTS_ANTHROPIC_EFFORT", "anthropic_effort",
-            "Claude effort", "Step 8: Effort Level",
-            "Configure Claude effort level", ask_anthropic_effort,
+            "TRADINGAGENTS_ANTHROPIC_EFFORT",
+            "anthropic_effort",
+            "Claude effort",
+            "Step 8: Effort Level",
+            "Configure Claude effort level",
+            ask_anthropic_effort,
         )
 
     return {
@@ -757,9 +760,7 @@ def get_user_selections():
 def get_analysis_date():
     """Get the analysis date from user input."""
     while True:
-        date_str = typer.prompt(
-            "", default=datetime.datetime.now().strftime("%Y-%m-%d")
-        )
+        date_str = typer.prompt("", default=datetime.datetime.now().strftime("%Y-%m-%d"))
         try:
             # Validate date format and ensure it's not in the future
             analysis_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
@@ -768,9 +769,7 @@ def get_analysis_date():
                 continue
             return date_str
         except ValueError:
-            console.print(
-                "[red]Error: Invalid date format. Please use YYYY-MM-DD[/red]"
-            )
+            console.print("[red]Error: Invalid date format. Please use YYYY-MM-DD[/red]")
 
 
 def save_report_to_disk(final_state, ticker: str, save_path: Path):
@@ -796,7 +795,9 @@ def display_complete_report(final_state):
     if analysts:
         console.print(Panel("[bold]I. Analyst Team Reports[/bold]", border_style="cyan"))
         for title, content in analysts:
-            console.print(Panel(Markdown(content), title=title, border_style="blue", padding=(1, 2)))
+            console.print(
+                Panel(Markdown(content), title=title, border_style="blue", padding=(1, 2))
+            )
 
     # II. Research Team Reports
     if final_state.get("investment_debate_state"):
@@ -811,12 +812,21 @@ def display_complete_report(final_state):
         if research:
             console.print(Panel("[bold]II. Research Team Decision[/bold]", border_style="magenta"))
             for title, content in research:
-                console.print(Panel(Markdown(content), title=title, border_style="blue", padding=(1, 2)))
+                console.print(
+                    Panel(Markdown(content), title=title, border_style="blue", padding=(1, 2))
+                )
 
     # III. Trading Team
     if final_state.get("trader_investment_plan"):
         console.print(Panel("[bold]III. Trading Team Plan[/bold]", border_style="yellow"))
-        console.print(Panel(Markdown(final_state["trader_investment_plan"]), title="Trader", border_style="blue", padding=(1, 2)))
+        console.print(
+            Panel(
+                Markdown(final_state["trader_investment_plan"]),
+                title="Trader",
+                border_style="blue",
+                padding=(1, 2),
+            )
+        )
 
     # IV. Risk Management Team
     if final_state.get("risk_debate_state"):
@@ -829,14 +839,25 @@ def display_complete_report(final_state):
         if risk.get("neutral_history"):
             risk_reports.append(("Neutral Analyst", risk["neutral_history"]))
         if risk_reports:
-            console.print(Panel("[bold]IV. Risk Management Team Decision[/bold]", border_style="red"))
+            console.print(
+                Panel("[bold]IV. Risk Management Team Decision[/bold]", border_style="red")
+            )
             for title, content in risk_reports:
-                console.print(Panel(Markdown(content), title=title, border_style="blue", padding=(1, 2)))
+                console.print(
+                    Panel(Markdown(content), title=title, border_style="blue", padding=(1, 2))
+                )
 
         # V. Portfolio Manager Decision
         if risk.get("judge_decision"):
             console.print(Panel("[bold]V. Portfolio Manager Decision[/bold]", border_style="green"))
-            console.print(Panel(Markdown(risk["judge_decision"]), title="Portfolio Manager", border_style="blue", padding=(1, 2)))
+            console.print(
+                Panel(
+                    Markdown(risk["judge_decision"]),
+                    title="Portfolio Manager",
+                    border_style="blue",
+                    padding=(1, 2),
+                )
+            )
 
 
 def update_research_team_status(status):
@@ -909,6 +930,7 @@ def update_analyst_statuses(message_buffer, chunk, wall_time_tracker=None):
     ):
         message_buffer.update_agent_status("Bull Researcher", "in_progress")
 
+
 def extract_content_string(content):
     """Extract string content from various message formats.
     Returns None if no meaningful text content is found.
@@ -917,7 +939,7 @@ def extract_content_string(content):
 
     def is_empty(val):
         """Check if value is empty using Python's truthiness."""
-        if val is None or val == '':
+        if val is None or val == "":
             return True
         if isinstance(val, str):
             s = val.strip()
@@ -936,16 +958,17 @@ def extract_content_string(content):
         return content.strip()
 
     if isinstance(content, dict):
-        text = content.get('text', '')
+        text = content.get("text", "")
         return text.strip() if not is_empty(text) else None
 
     if isinstance(content, list):
         text_parts = [
-            item.get('text', '').strip() if isinstance(item, dict) and item.get('type') == 'text'
-            else (item.strip() if isinstance(item, str) else '')
+            item.get("text", "").strip()
+            if isinstance(item, dict) and item.get("type") == "text"
+            else (item.strip() if isinstance(item, str) else "")
             for item in content
         ]
-        result = ' '.join(t for t in text_parts if t and not is_empty(t))
+        result = " ".join(t for t in text_parts if t and not is_empty(t))
         return result if result else None
 
     return str(content).strip() if not is_empty(content) else None
@@ -960,7 +983,7 @@ def classify_message_type(message) -> tuple[str, str | None]:
     """
     from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-    content = extract_content_string(getattr(message, 'content', None))
+    content = extract_content_string(getattr(message, "content", None))
 
     if isinstance(message, HumanMessage):
         if content and content.strip() == "Continue":
@@ -981,8 +1004,9 @@ def format_tool_args(args, max_length=80) -> str:
     """Format tool arguments for terminal display."""
     result = str(args)
     if len(result) > max_length:
-        return result[:max_length - 3] + "..."
+        return result[: max_length - 3] + "..."
     return result
+
 
 def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
     """Assemble the run config from interactive selections, honoring env precedence.
@@ -1022,6 +1046,7 @@ def run_analysis(checkpoint: bool | None = None):
             import webbrowser
 
             from visualizer import bridge as _vb, server as _vs
+
             _viz_port = _vs.start()
             webbrowser.open_new_tab(f"http://127.0.0.1:{_viz_port}")
             _viz_bridge = _vb
@@ -1066,6 +1091,7 @@ def run_analysis(checkpoint: bool | None = None):
 
     def save_message_decorator(obj, func_name):
         func = getattr(obj, func_name)
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             func(*args, **kwargs)
@@ -1073,10 +1099,12 @@ def run_analysis(checkpoint: bool | None = None):
             content = content.replace("\n", " ")  # Replace newlines with spaces
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} [{message_type}] {content}\n")
+
         return wrapper
 
     def save_tool_call_decorator(obj, func_name):
         func = getattr(obj, func_name)
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             func(*args, **kwargs)
@@ -1084,29 +1112,42 @@ def run_analysis(checkpoint: bool | None = None):
             args_str = ", ".join(f"{k}={v}" for k, v in args.items())
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} [Tool Call] {tool_name}({args_str})\n")
+
         return wrapper
 
     def save_report_section_decorator(obj, func_name):
         func = getattr(obj, func_name)
+
         @wraps(func)
         def wrapper(section_name, content):
             func(section_name, content)
-            if section_name in obj.report_sections and obj.report_sections[section_name] is not None:
+            if (
+                section_name in obj.report_sections
+                and obj.report_sections[section_name] is not None
+            ):
                 content = obj.report_sections[section_name]
                 if content:
                     file_name = f"{section_name}.md"
-                    text = "\n".join(str(item) for item in content) if isinstance(content, list) else content
+                    text = (
+                        "\n".join(str(item) for item in content)
+                        if isinstance(content, list)
+                        else content
+                    )
                     with open(report_dir / file_name, "w", encoding="utf-8") as f:
                         f.write(text)
+
         return wrapper
 
     message_buffer.add_message = save_message_decorator(message_buffer, "add_message")
     message_buffer.add_tool_call = save_tool_call_decorator(message_buffer, "add_tool_call")
-    message_buffer.update_report_section = save_report_section_decorator(message_buffer, "update_report_section")
+    message_buffer.update_report_section = save_report_section_decorator(
+        message_buffer, "update_report_section"
+    )
 
     # Hook agent-status updates to emit visualizer events.
     if _viz_bridge is not None:
         _orig_update_agent_status = message_buffer.update_agent_status
+
         def _viz_status_hook(agent, status, _orig=_orig_update_agent_status):
             # Capture the previous status BEFORE calling _orig so we can detect
             # real transitions.  update_research_team_status("in_progress") is
@@ -1120,6 +1161,7 @@ def run_analysis(checkpoint: bool | None = None):
                 _viz_bridge.emit({"type": "agent_active", "agent": agent})
             elif status == "completed" and prev == "in_progress":
                 _viz_bridge.emit({"type": "agent_idle", "agent": agent})
+
         message_buffer.update_agent_status = _viz_status_hook
 
     # Now start the display layout
@@ -1133,9 +1175,7 @@ def run_analysis(checkpoint: bool | None = None):
         message_buffer.add_message("System", f"Selected ticker: {selections['ticker']}")
         if selections["asset_type"] != "stock":
             message_buffer.add_message("System", f"Detected asset type: {selections['asset_type']}")
-        message_buffer.add_message(
-            "System", f"Analysis date: {selections['analysis_date']}"
-        )
+        message_buffer.add_message("System", f"Analysis date: {selections['analysis_date']}")
         message_buffer.add_message(
             "System",
             f"Selected analysts: {', '.join(analyst.value for analyst in selections['analysts'])}",
@@ -1149,9 +1189,7 @@ def run_analysis(checkpoint: bool | None = None):
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
 
         # Create spinner text
-        spinner_text = (
-            f"Analyzing {selections['ticker']} on {selections['analysis_date']}..."
-        )
+        spinner_text = f"Analyzing {selections['ticker']} on {selections['analysis_date']}..."
         update_display(layout, spinner_text, stats_handler=stats_handler, start_time=start_time)
 
         # Initialize state and get graph args with callbacks.
@@ -1173,11 +1211,13 @@ def run_analysis(checkpoint: bool | None = None):
 
         # Notify the visualizer that the analysis is starting.
         if _viz_bridge is not None:
-            _viz_bridge.emit({
-                "type": "workflow_start",
-                "ticker": selections["ticker"],
-                "date": selections["analysis_date"],
-            })
+            _viz_bridge.emit(
+                {
+                    "type": "workflow_start",
+                    "ticker": selections["ticker"],
+                    "date": selections["analysis_date"],
+                }
+            )
 
         # Stream the analysis
         trace = []
@@ -1197,11 +1237,13 @@ def run_analysis(checkpoint: bool | None = None):
                     if msg_type == "Agent" and _viz_bridge is not None:
                         current = message_buffer.current_agent
                         if current:
-                            _viz_bridge.emit({
-                                "type": "agent_message",
-                                "agent": current,
-                                "text": content.strip()[:500],
-                            })
+                            _viz_bridge.emit(
+                                {
+                                    "type": "agent_message",
+                                    "agent": current,
+                                    "text": content.strip()[:500],
+                                }
+                            )
 
                 if hasattr(message, "tool_calls") and message.tool_calls:
                     for tool_call in message.tool_calls:
@@ -1320,11 +1362,13 @@ def run_analysis(checkpoint: bool | None = None):
                 _final_signal = graph.process_signal(final_state.get("final_trade_decision", ""))
             except Exception:
                 _final_signal = "HOLD"
-            _viz_bridge.emit({
-                "type": "workflow_complete",
-                "signal": _final_signal,
-                "ticker": selections["ticker"],
-            })
+            _viz_bridge.emit(
+                {
+                    "type": "workflow_complete",
+                    "signal": _final_signal,
+                    "ticker": selections["ticker"],
+                }
+            )
 
         message_buffer.add_message(
             "System", f"Completed analysis for {selections['analysis_date']}"
@@ -1348,8 +1392,7 @@ def run_analysis(checkpoint: bool | None = None):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         default_path = Path.cwd() / "reports" / f"{selections['ticker']}_{timestamp}"
         save_path_str = typer.prompt(
-            "Save path (press Enter for default)",
-            default=str(default_path)
+            "Save path (press Enter for default)", default=str(default_path)
         ).strip()
         save_path = Path(save_path_str)
         try:
@@ -1381,9 +1424,22 @@ def analyze(
 ):
     if clear_checkpoints:
         from tradingagents.graph.checkpointer import clear_all_checkpoints
+
         n = clear_all_checkpoints(DEFAULT_CONFIG["data_cache_dir"])
         console.print(f"[yellow]Cleared {n} checkpoint(s).[/yellow]")
-    run_analysis(checkpoint=checkpoint)
+    try:
+        run_analysis(checkpoint=checkpoint)
+    except _NO_CONSOLE_ERRORS:
+        # A terminal with no console buffer cannot host the interactive prompts.
+        # Emit one actionable line on stderr instead of a prompt_toolkit
+        # traceback; plain text, since rich may not render here either (#1138).
+        typer.echo(
+            "Error: no Windows console available. The interactive CLI needs a real "
+            "console buffer — run it from Windows Terminal, PowerShell, or cmd.exe "
+            "rather than a piped or embedded terminal.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from None
 
 
 if __name__ == "__main__":

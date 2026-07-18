@@ -12,6 +12,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
 )
 from tradingagents.agents.utils.structured import (
+    NO_EXTERNAL_TOOLS,
     bind_structured,
     invoke_structured_or_freetext,
 )
@@ -34,7 +35,8 @@ def create_trader(llm):
                     "Anchor your reasoning in the analysts' reports and the research plan. "
                     "Evaluate expected forward returns over a one-year investment horizon, prioritising "
                     "structural, fundamentals-driven drivers of value appreciation or deterioration "
-                    "over near-term technical signals or short-term price momentum."
+                    "over near-term technical signals or short-term price momentum. "
+                    + NO_EXTERNAL_TOOLS
                     + get_language_instruction()
                 ),
             },
