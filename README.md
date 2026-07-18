@@ -2,6 +2,8 @@
 
 > This is a fork of [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) extended to support OEIC / mutual fund analysis via proxy holdings.
 
+> This library has been deployed and productionized as a personal automation workflow for investing in funds. You can quickly view some sample output of the library here: [jyjulianwong/S3-Browser-TradingAgents-Funds-Runner](https://jyjulianwong.github.io/S3-Browser-TradingAgents-Funds-Runner/)
+
 ## What this fork adds
 
 Vanilla TradingAgents is built around exchange-listed tickers (`AAPL`, `BTC-USD`, `7203.T`, etc.) — instruments that have live price feeds, social media presence, and financial statement coverage. Mutual funds identified by ISINs (e.g. `GB00B56FW078`) don't fit this mould: they have no exchange-traded price, no StockTwits cashtag, and no income statement on Yahoo Finance.
