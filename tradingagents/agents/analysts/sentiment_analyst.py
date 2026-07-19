@@ -68,12 +68,16 @@ def _fetch_multi_ticker_blocks(
 
     for t in mapped_tickers:
         if t.upper() == isin.upper():
-            header = f"### {t} (ISIN — direct fund search)"
+            # News may surface fund announcements indexed by ISIN — keep it.
+            # StockTwits and Reddit never index ISINs, so skip both to avoid
+            # wasting tokens on guaranteed-empty results.
+            header = f"### {t} (ISIN — direct fund news search)"
+            news_parts.append(f"{header}\n{get_news.func(t, start_date, end_date)}")
         else:
             header = f"### {t} (mapped from fund ISIN {isin})"
-        news_parts.append(f"{header}\n{get_news.func(t, start_date, end_date)}")
-        stocktwits_parts.append(f"{header}\n{fetch_stocktwits_messages(t, limit=30)}")
-        reddit_parts.append(f"{header}\n{fetch_reddit_posts(t)}")
+            news_parts.append(f"{header}\n{get_news.func(t, start_date, end_date)}")
+            stocktwits_parts.append(f"{header}\n{fetch_stocktwits_messages(t, limit=30)}")
+            reddit_parts.append(f"{header}\n{fetch_reddit_posts(t)}")
 
     return (
         "\n\n".join(news_parts),
@@ -196,14 +200,17 @@ def _build_system_message(
     aggregate as a proxy for the fund's sentiment.
     """
     if mapped_tickers:
+        proxy_tickers = [t for t in mapped_tickers if t.upper() != ticker.upper()]
         subject_description = (
-            f"{ticker} (a fund). Because funds are identified by ISIN on "
-            f"exchanges but discussed on social media by their exchange-listed "
-            f"ticker symbols or constituent holdings, sentiment data has been "
-            f"collected for the following mapped tickers: "
-            f"{', '.join(mapped_tickers)}. Each section in the data blocks "
-            f"below is labelled by ticker. Synthesise all sections into a "
-            f"single, unified sentiment picture for the fund as a whole."
+            f"{ticker} (a fund). Funds are identified by ISIN but discussed on "
+            f"social media under exchange-listed proxy symbols. "
+            f"News has been collected for both the ISIN ({ticker}) and its proxy "
+            f"tickers ({', '.join(proxy_tickers)}). "
+            f"StockTwits and Reddit data has been collected for proxy tickers only "
+            f"({', '.join(proxy_tickers)}) — ISINs are not indexed on retail social "
+            f"platforms. Each section in the data blocks below is labelled by ticker. "
+            f"Synthesise all sections into a single, unified sentiment picture for "
+            f"the fund as a whole."
         )
     else:
         subject_description = ticker

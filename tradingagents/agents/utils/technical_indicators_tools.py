@@ -1,8 +1,13 @@
+import re
 from typing import Annotated
 
 from langchain_core.tools import tool
 
 from tradingagents.dataflows.interface import route_to_vendor
+
+# Cannot import _ISIN_RE from agent_utils — agent_utils imports this module,
+# so the dependency must go the other way. Inline the same pattern here.
+_ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
 
 @tool
@@ -28,8 +33,13 @@ def get_indicators(
     indicators = [i.strip().lower() for i in indicator.split(",") if i.strip()]
     results = []
     for ind in indicators:
+        if ind == "atr" and _ISIN_RE.match(symbol.strip().upper()):
+            results.append(f"ATR not applicable — OEIC O/H/L data is not published for {symbol}.")
+            continue
         try:
-            results.append(route_to_vendor("get_indicators", symbol, ind, curr_date, look_back_days))
+            results.append(
+                route_to_vendor("get_indicators", symbol, ind, curr_date, look_back_days)
+            )
         except ValueError as e:
             results.append(str(e))
     return "\n\n".join(results)

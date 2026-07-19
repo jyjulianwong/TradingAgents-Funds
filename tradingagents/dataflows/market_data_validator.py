@@ -10,6 +10,7 @@ claim. Deterministic, no LLM involved.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 
 import pandas as pd
@@ -17,11 +18,23 @@ from stockstats import wrap
 
 from tradingagents.dataflows.stockstats_utils import load_ohlcv
 
+# Matches the standard 12-character ISIN format: 2-letter country code,
+# 9 alphanumeric characters, 1 numeric check digit.
+_ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+
 # A fixed, common indicator set so the snapshot is the same shape every run.
 DEFAULT_SNAPSHOT_INDICATORS: tuple[str, ...] = (
-    "close_10_ema", "close_50_sma", "close_200_sma",
-    "rsi", "boll", "boll_ub", "boll_lb",
-    "macd", "macds", "macdh", "atr",
+    "close_10_ema",
+    "close_50_sma",
+    "close_200_sma",
+    "rsi",
+    "boll",
+    "boll_ub",
+    "boll_lb",
+    "macd",
+    "macds",
+    "macdh",
+    "atr",
 )
 
 
@@ -52,7 +65,7 @@ def _fmt(value) -> str:
         return value.strftime("%Y-%m-%d")
     if isinstance(value, bool):
         return str(value)
-    if isinstance(value, (int,)):
+    if isinstance(value, int):
         return str(value)
     if isinstance(value, float):
         return f"{value:.2f}"
@@ -81,6 +94,12 @@ def build_verified_market_snapshot(
         except Exception as exc:  # noqa: BLE001 — one bad indicator shouldn't sink the snapshot
             indicator_values[name] = f"N/A ({type(exc).__name__})"
 
+    # ATR requires intraday High/Low data that OEIC/unit-trust NAV series do not
+    # publish (Yahoo Finance returns Open=High=Low=0). Override the stockstats
+    # value — which degenerates to ~NAV when H=L=0 — with an explicit notice.
+    if "atr" in indicator_values and _ISIN_RE.match(symbol.strip().upper()):
+        indicator_values["atr"] = f"N/A — OEIC O/H/L data is not published for {symbol}"
+
     latest = df.iloc[-1]
     latest_date = _fmt(latest["Date"])
     window = max(1, min(int(look_back_days), 30))
@@ -101,13 +120,23 @@ def build_verified_market_snapshot(
     for field in ("Open", "High", "Low", "Close", "Volume"):
         lines.append(f"| {field} | {_fmt(latest.get(field))} |")
 
-    lines += ["", "### Verified technical indicators (latest row)", "",
-              "| Indicator | Value |", "|---|---:|"]
+    lines += [
+        "",
+        "### Verified technical indicators (latest row)",
+        "",
+        "| Indicator | Value |",
+        "|---|---:|",
+    ]
     for name, value in indicator_values.items():
         lines.append(f"| {name} | {value} |")
 
-    lines += ["", f"### Recent verified closes (last {len(recent)} rows)", "",
-              "| Date | Close |", "|---|---:|"]
+    lines += [
+        "",
+        f"### Recent verified closes (last {len(recent)} rows)",
+        "",
+        "| Date | Close |",
+        "|---|---:|",
+    ]
     for _, row in recent.iterrows():
         lines.append(f"| {_fmt(row['Date'])} | {_fmt(row.get('Close'))} |")
 

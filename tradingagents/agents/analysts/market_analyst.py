@@ -34,8 +34,11 @@ def create_market_analyst(llm):
             isin_note = (
                 f"\n\nThis instrument is a fund identified by ISIN `{ticker}`. Its"
                 f" price reflects the fund's Net Asset Value (NAV), computed once per"
-                f" business day — volume will always be zero and volume-based"
-                f" indicators (e.g. VWMA) will be unavailable for the ISIN itself."
+                f" business day — volume will always be zero, volume-based"
+                f" indicators (e.g. VWMA) will be unavailable for the ISIN itself,"
+                f" and **ATR is not applicable for the ISIN** (OEIC funds publish only"
+                f" a daily Close/NAV; Open/High/Low are not published, so ATR"
+                f" degenerates to a meaningless value — use ATR from proxy tickers only)."
                 f" To produce a complete market analysis, retrieve and report data for"
                 f" all of the following symbols: {symbols_fmt}. `{ticker}` is the"
                 f" fund's own NAV price series; {proxies_fmt} are exchange-traded"
