@@ -192,27 +192,27 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # as-is for the search (which will typically return empty results from all
     # three sentiment sources).
     "isin_ticker_map": {
-        "GB00BJS8SF95": ["ISF.L"],  # Fidelity Index UK P Acc (FTSE All-Share proxy)
+        "GB00BJS8SF95": ["ISF.L"],  # Fidelity Index UK P Acc (FTSE All-Share) — ISF.L tracks FTSE 100 (~85% of All-Share by cap), best liquid LSE proxy; no liquid FTSE All-Share ETF exists
         "GB00BJS8SH10": ["SPY"],  # Fidelity Index US P Acc (S&P 500)
-        "GB00B8HPRW47": ["TEL", "XYL", "ECL"],  # FP WHEB Sustainability Impact C Acc (top 3 holdings)
+        "GB00B8HPRW47": ["ADSK", "XYL", "ECL"],  # FP WHEB Sustainability Impact C Acc — verified top holdings (Autodesk, Xylem, Ecolab cover resource efficiency, water, environmental services themes; ADSK has larger weight than TE Connectivity)
         "GB00B80QG615": ["SPY"],  # HSBC American Index Acc C (S&P 500)
         "GB00BN08ZN29": ["SLXX.L"],  # iShares Corporate Bond Index S Acc (iBoxx GBP Non-Gilts proxy)
-        "GB00BN091933": ["IWDP.L"],  # iShares Enviro & Low Carbon Tilt Real Estate S Acc (FTSE EPRA Nareit proxy)
+        "GB00BN091933": ["IWDP.L", "REET"],  # iShares Enviro & Low Carbon Tilt Real Estate S Acc — no liquid low-carbon REIT ETF exists; IWDP.L (FTSE EPRA Nareit Developed Div+) and REET (global REIT) are the best available proxies
         "GB00BN08ZG51": ["EWJ"],  # iShares Japan Equity Index S Acc (FTSE Japan)
         "GB00BN08ZQ59": ["EPP"],  # iShares Pacific ex Japan Equity Index S Acc
-        "GB00BG0QP042": ["ASML", "ROG.SW", "NOVN.SW"],  # L&G European Index C Acc (FTSE World Europe ex UK)
-        "GB00BL6C2119": ["EEM"],  # L&G Future World ESG Tilted & Opt Emerging Markets C Acc
+        "GB00BG0QP042": ["VGK", "ASML"],  # L&G European Index C Acc (FTSE World Europe ex UK) — VGK (Vanguard FTSE Developed Europe ETF) is FTSE-family and highly liquid; replaces ROG.SW/NOVN.SW which are Swiss-listed with higher data-gap risk; ASML retained as the fund's largest holding
+        "GB00BL6C2119": ["ESGE"],  # L&G Future World ESG Tilted & Opt Emerging Markets C Acc — ESGE (iShares ESG Aware MSCI EM ETF) has correct ESG tilt; EEM had no ESG screens
         "GB00BMFXWS95": ["IWDA.L"],  # L&G Future World ESG Tilted & Opt Developed C Acc
-        "GB00BJLP1W53": ["IXN"],  # L&G Global Technology Index Trust C Acc (FTSE World Technology)
+        "GB00BJLP1W53": ["IXN"],  # L&G Global Technology Index Trust C Acc (FTSE World Technology) — IXN tracks S&P Global 1200 IT (genuinely global); VGT/QQQ are US-only or mixed-sector
         "GB00BK5HLJ16": ["IWDP.L"],  # abrdn Global REIT Tracker N Acc (FTSE EPRA Nareit Developed)
-        "GB00B784NS11": ["REGN", "VRTX", "AMGN"],  # AXA Framlington Biotech Z Acc (top 3 holdings)
-        "GB00B6WZJX05": ["LLY", "TMO", "AZN"],  # AXA Framlington Health Z Acc (top 3 holdings)
-        "GB00B3B9VD63": ["CTVA", "NTR", "MOS"],  # Barings Global Agriculture I Acc (top 3 holdings)
-        "GB00B6865B79": ["XOM", "SHEL", "WPM"],  # BlackRock Natural Resources D Acc (top 3 holdings)
-        "GB00B88MP089": ["XOM", "NEM", "SHEL"],  # JPMorgan Natural Resources C Acc (top 3 holdings)
-        "GB00BVLL5586": ["GOLD", "NEM", "AU"],  # Ninety One Global Gold B Inc (top 3 holdings)
-        "GB00B76V7Q08": ["JNJ", "LLY", "UNH"],  # Schroder Global Healthcare Z Acc (top 3 holdings)
-        "GB00B56FW078": ["XOM", "SHEL", "COP"]  # WS Guinness Global Energy I Acc (largest weights, proxy via sister strategy)
+        "GB00B784NS11": ["IBB"],  # AXA Framlington Biotech Z Acc — IBB (iShares Nasdaq Biotech) top holdings (VRTX, AMGN, Gilead) match fund's actual holdings; reduces idiosyncratic single-stock noise vs 3 individual names
+        "GB00B6WZJX05": ["IXJ"],  # AXA Framlington Health Z Acc — IXJ (iShares Global Healthcare) covers ~110 global healthcare leaders; XLV is US-only, unsuitable for a global-mandate fund
+        "GB00B3B9VD63": ["MOO"],  # Barings Global Agriculture I Acc — MOO (VanEck Agribusiness ETF) covers full global agribusiness value chain (seeds, fertilisers, equipment, food processing); CTVA/NTR/MOS were too US-heavy and fertiliser-narrow
+        "GB00B6865B79": ["GNR"],  # BlackRock Natural Resources D Acc — GNR (SPDR S&P Global Natural Resources ETF) top holdings (Shell, BHP, Exxon, Glencore, FCX) closely mirror fund composition; WPM (precious-metals royalty streamer) was an outlier driving unrepresentative bear signals
+        "GB00B88MP089": ["GNR", "XOM"],  # JPMorgan Natural Resources C Acc — GNR captures broad global natural resources; XOM adds energy weighting; NEM (gold miner) removed as it introduced gold-specific bias unrepresentative of the fund
+        "GB00BVLL5586": ["GDX", "NEM", "GOLD"],  # Ninety One Global Gold B Inc — GDX (VanEck Gold Miners ETF) added as primary sector ETF; NEM and GOLD are verified top-2 holdings of this ~25-stock concentrated fund
+        "GB00B76V7Q08": ["IXJ"],  # Schroder Global Healthcare Z Acc — IXJ (iShares Global Healthcare) provides global coverage; JNJ/LLY/UNH were US-biased, missing European pharma exposure
+        "GB00B56FW078": ["IXC", "XOM", "SHEL"]  # WS Guinness Global Energy I Acc — IXC (iShares Global Energy ETF) added as primary global-energy proxy; XOM and SHEL are confirmed top holdings of this 30-position equal-weight global energy fund
     },
     # CLI-only settings — consumed by cli/main.py; ignored by the programmatic API.
     # None means "ask interactively"; a non-None value skips the interactive prompt.
