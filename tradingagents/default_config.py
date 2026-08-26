@@ -141,7 +141,10 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
         "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
         "prediction_markets": "polymarket",  # Options: polymarket (keyless)
-        "fund_fact_sheet_data": "mstarpy",   # Options: mstarpy (needs Chrome; see mstarpy_fund.py)
+        # "hl,mstarpy": try Hargreaves Lansdown first (plain HTML scrape, no
+        # Chrome, GB00-ISIN-only, instantly declines anything else) then fall
+        # back to mstarpy (Morningstar via Selenium, any ISIN, needs Chrome).
+        "fund_fact_sheet_data": "hl,mstarpy",
     },
     # Tool-level configuration (takes precedence over category-level).
     # "ohlcv_interval" sets the candle interval for every OHLCV fetch

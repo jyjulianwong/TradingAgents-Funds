@@ -18,6 +18,7 @@ from .errors import (
     VendorRateLimitError,
 )
 from .fred import get_macro_data as get_fred_macro_data
+from .hl_fund import get_fund_holdings as get_hl_fund_holdings
 from .mstarpy_fund import get_fund_holdings as get_mstarpy_fund_holdings
 from .polymarket import get_prediction_markets as get_polymarket_prediction_markets
 from .y_finance import (
@@ -90,6 +91,7 @@ VENDOR_LIST = [
     "polymarket",
     "alpha_vantage",
     "mstarpy",
+    "hl",
 ]
 
 # Optional enrichment categories. These add macro/event context to the news
@@ -154,10 +156,15 @@ VENDOR_METHODS = {
     "get_prediction_markets": {
         "polymarket": get_polymarket_prediction_markets,
     },
-    # fund_fact_sheet_data — additional providers plug in here (e.g. a second
-    # fund data source) without touching the Fund Analyst node or the tool.
+    # fund_fact_sheet_data — additional providers plug in here without
+    # touching the Fund Analyst node or the tool. "hl" (Hargreaves Lansdown,
+    # HTML scrape) only covers GB00-domiciled ISINs and declines everything
+    # else instantly (no network call); "mstarpy" (Morningstar via Selenium)
+    # covers any ISIN globally but is slower and Chrome-dependent. Default
+    # chain tries hl first — see default_config.py.
     "get_fund_fact_sheet": {
         "mstarpy": get_mstarpy_fund_holdings,
+        "hl": get_hl_fund_holdings,
     },
 }
 
