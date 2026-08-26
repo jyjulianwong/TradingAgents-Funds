@@ -52,6 +52,16 @@ class AgentState(MessagesState):
 
     sender: Annotated[str, "Agent that sent this message"]
 
+    # fund resolution step — populated by the Fund Analyst, the graph's first
+    # node. Absent (key missing) means the Fund Analyst has not run yet
+    # (pre-graph resolution, bare/test states); present-but-empty means it
+    # ran and found no proxy tickers (non-fund ticker, or a fund ISIN with no
+    # mstarpy data and no isin_ticker_map fallback entry).
+    fund_proxy_tickers: Annotated[
+        list[str], "Proxy tickers resolved for a fund ISIN, if any"
+    ]
+    fund_report: Annotated[str, "Report from the Fund Analyst"]
+
     # research step
     market_report: Annotated[str, "Report from the Market Analyst"]
     sentiment_report: Annotated[str, "Report from the Sentiment Analyst"]

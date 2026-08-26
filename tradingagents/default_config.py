@@ -141,6 +141,7 @@ DEFAULT_CONFIG = _apply_env_overrides({
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
         "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
         "prediction_markets": "polymarket",  # Options: polymarket (keyless)
+        "fund_fact_sheet_data": "mstarpy",   # Options: mstarpy (needs Chrome; see mstarpy_fund.py)
     },
     # Tool-level configuration (takes precedence over category-level).
     # "ohlcv_interval" sets the candle interval for every OHLCV fetch
@@ -171,15 +172,17 @@ DEFAULT_CONFIG = _apply_env_overrides({
         ".SZ":  "399001.SZ",   # Shenzhen (SZSE Component)
         "":     "SPY",         # default for US-listed tickers (no suffix)
     },
-    # ISIN-to-ticker mapping for the Sentiment Analyst.
+    # ISIN-to-ticker mapping — static BACKUP only.
     #
-    # Social-media platforms (StockTwits, Reddit) index posts by exchange
-    # ticker / cashtag (e.g. $AAPL), not by ISIN. When the instrument under
-    # analysis is a fund identified by an ISIN, searching for the raw ISIN
-    # string returns no results. Populate this dict to map each fund ISIN to
-    # one or more representative stock tickers that people actually discuss on
-    # social platforms (e.g. the fund's exchange-listed ticker symbols or its
-    # largest constituent holdings).
+    # The Fund Analyst (the graph's first node) tries to derive proxy tickers
+    # dynamically for any fund ISIN, from the fund's actual holdings via the
+    # get_fund_fact_sheet tool (mstarpy/Morningstar). This map is only
+    # consulted when that fails or returns nothing — no mstarpy data for the
+    # ISIN, no Chrome available in the deployment environment, or the LLM's
+    # synthesis came back empty. Every downstream agent (analysts, social-media
+    # search included) reads whichever list the Fund Analyst resolved, from
+    # ``state["fund_proxy_tickers"]``, not this map directly — see
+    # ``resolve_isin_ticker_list`` in agents/utils/agent_utils.py.
     #
     # Format:
     #   "<ISIN>": ["<TICKER_1>", "<TICKER_2>", ...]
@@ -188,9 +191,9 @@ DEFAULT_CONFIG = _apply_env_overrides({
     #   "IE00B4L5Y983": ["IWDA.L", "SWRD.L"],  # iShares Core MSCI World ETF
     #   "IE00B3RBWM25": ["VWRL.L"],             # Vanguard FTSE All-World ETF
     #
-    # If an ISIN is not listed here, a warning is logged and the ISIN is used
-    # as-is for the search (which will typically return empty results from all
-    # three sentiment sources).
+    # If an ISIN is not listed here (and mstarpy also had nothing), a warning
+    # is logged and the ISIN is used as-is (which will typically return empty
+    # results from data vendors and social-media sources alike).
     "isin_ticker_map": {
         "GB00BJS8SF95": ["ISF.L"],  # Fidelity Index UK P Acc (FTSE All-Share) — ISF.L tracks FTSE 100 (~85% of All-Share by cap), best liquid LSE proxy; no liquid FTSE All-Share ETF exists
         "GB00BJS8SH10": ["SPY"],  # Fidelity Index US P Acc (S&P 500)

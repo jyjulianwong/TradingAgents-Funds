@@ -112,7 +112,7 @@ def create_sentiment_analyst(llm):
         # show empty social results (correctly signalling that the fund is not
         # discussed under its ISIN on retail platforms); the proxy sections
         # carry the actual social signal.
-        sentiment_tickers = resolve_isin_ticker_list(ticker)
+        sentiment_tickers = resolve_isin_ticker_list(ticker, state)
         is_mapped = len(sentiment_tickers) > 1
 
         # Pre-fetch all three sources. Each fetcher degrades gracefully and

@@ -10,6 +10,7 @@ from tradingagents.agents import (
     create_bear_researcher,
     create_bull_researcher,
     create_conservative_debator,
+    create_fund_analyst,
     create_fundamentals_analyst,
     create_market_analyst,
     create_msg_delete,
@@ -72,6 +73,10 @@ class GraphSetup:
         """
         plan = build_analyst_execution_plan(selected_analysts)
 
+        # Resolves fund-ISIN tickers to proxy tickers before any analyst runs;
+        # a no-op for ordinary stock/crypto tickers (see fund_analyst.py).
+        fund_analyst_node = create_fund_analyst(self.quick_thinking_llm)
+
         analyst_factories = {
             "market": lambda: create_market_analyst(self.quick_thinking_llm),
             "social": lambda: create_sentiment_analyst(self.quick_thinking_llm),
@@ -101,6 +106,7 @@ class GraphSetup:
             workflow.add_node(spec.tool_node, self.tool_nodes[spec.key])
 
         # Add other nodes
+        workflow.add_node("Fund Analyst", fund_analyst_node)
         workflow.add_node("Bull Researcher", bull_researcher_node)
         workflow.add_node("Bear Researcher", bear_researcher_node)
         workflow.add_node("Research Manager", research_manager_node)
@@ -111,8 +117,11 @@ class GraphSetup:
         workflow.add_node("Portfolio Manager", portfolio_manager_node)
 
         # Define edges
-        # Start with the first analyst
-        workflow.add_edge(START, plan.specs[0].agent_node)
+        # Fund Analyst runs first, unconditionally — it resolves fund-ISIN
+        # proxy tickers (or no-ops for ordinary tickers) before any analyst
+        # sees the ticker.
+        workflow.add_edge(START, "Fund Analyst")
+        workflow.add_edge("Fund Analyst", plan.specs[0].agent_node)
 
         # Connect analysts in sequence
         for i, spec in enumerate(plan.specs):
