@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage, RemoveMessage
 
 # Import tools from separate utility files
 from tradingagents.agents.utils.core_stock_tools import get_stock_data
+from tradingagents.agents.utils.fund_data_tools import get_fund_fact_sheet
 from tradingagents.agents.utils.fundamental_data_tools import (
     get_balance_sheet,
     get_cashflow,
@@ -30,6 +31,7 @@ from tradingagents.agents.utils.technical_indicators_tools import get_indicators
 __all__ = [
     "get_stock_data",
     "get_indicators",
+    "get_fund_fact_sheet",
     "get_fundamentals",
     "get_balance_sheet",
     "get_cashflow",
@@ -43,6 +45,7 @@ __all__ = [
     "build_instrument_context",
     "resolve_instrument_identity",
     "resolve_isin_ticker_list",
+    "is_isin",
     "get_instrument_context_from_state",
     "get_fund_analysis_instruction",
     "get_language_instruction",
@@ -57,25 +60,43 @@ logger = logging.getLogger(__name__)
 _ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
 
-def resolve_isin_ticker_list(ticker: str) -> list[str]:
+def is_isin(ticker: str) -> bool:
+    """Return True if *ticker* looks like a 12-character ISIN, not a stock/crypto ticker."""
+    return bool(_ISIN_RE.match(ticker.strip().upper()))
+
+
+def resolve_isin_ticker_list(
+    ticker: str, state: Mapping[str, Any] | None = None
+) -> list[str]:
     """Return the ordered list of symbols to analyse for a given ticker.
 
-    For ordinary stock/crypto tickers, returns ``[ticker]``. When the input
-    looks like an ISIN and an entry exists in ``isin_ticker_map``, returns
-    ``[ticker] + mapped_tickers`` so that both the fund's own NAV price series
-    and the exchange-traded proxy holdings are queried. For ISINs with no
-    mapping, returns ``[ticker]`` with a warning (volume and financial-statement
-    data will likely be unavailable).
+    For ordinary stock/crypto tickers, returns ``[ticker]``.
+
+    For a fund ISIN, the Fund Analyst node (the graph's first node) resolves
+    proxy tickers dynamically — via its ``get_fund_fact_sheet`` tool, with
+    ``isin_ticker_map`` as a static backup — and stores the result in
+    ``state["fund_proxy_tickers"]``. When ``state`` is passed and already
+    carries that key, this returns ``[ticker] + state["fund_proxy_tickers"]``
+    directly; the Fund Analyst has already applied its own fallback, so no
+    further map lookup happens here. When ``state`` is omitted or the key is
+    absent (pre-graph resolution, or a bare state built without running the
+    Fund Analyst, e.g. in tests), this falls back to a direct
+    ``isin_ticker_map`` lookup with a warning if the ISIN isn't listed.
 
     Index 0 is always the original ticker (or ISIN); indices 1+ are the
-    configured proxies. Each analyst slices as appropriate — the market and
+    resolved proxies. Each analyst slices as appropriate — the market and
     fundamentals analysts use the full list; the sentiment analyst passes the
     full list too, with the ISIN appearing as a labelled section that will
     typically show empty social-media results (correctly signalling that the
     fund is not discussed under its ISIN on retail platforms).
     """
-    if not _ISIN_RE.match(ticker.strip().upper()):
+    if not is_isin(ticker):
         return [ticker]
+
+    if state is not None:
+        fund_tickers = state.get("fund_proxy_tickers")
+        if isinstance(fund_tickers, list):
+            return [ticker] + list(fund_tickers)
 
     from tradingagents.dataflows.config import get_config
 
@@ -95,7 +116,9 @@ def resolve_isin_ticker_list(ticker: str) -> list[str]:
     return [ticker]
 
 
-def get_fund_analysis_instruction(ticker: str) -> str:
+def get_fund_analysis_instruction(
+    ticker: str, state: Mapping[str, Any] | None = None
+) -> str:
     """Return fund-specific prompt instructions when *ticker* is an ISIN.
 
     Returns an empty string for non-ISIN tickers so it is safe to
@@ -111,11 +134,14 @@ def get_fund_analysis_instruction(ticker: str) -> str:
     - PE benchmarks should match the fund's underlying index, not a generic norm.
     - Proxy-ticker risks should inform sector/market context, not be imported as
       fund-level idiosyncratic risks.
+
+    Pass ``state`` (any node has it) so the proxy tickers named here match
+    the Fund Analyst's resolution instead of recomputing from the static map.
     """
-    if not _ISIN_RE.match(ticker.strip().upper()):
+    if not is_isin(ticker):
         return ""
 
-    mapped = resolve_isin_ticker_list(ticker)
+    mapped = resolve_isin_ticker_list(ticker, state)
     proxy_tickers = mapped[1:]
     proxy_note = (
         (

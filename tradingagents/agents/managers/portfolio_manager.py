@@ -66,7 +66,7 @@ def create_portfolio_manager(llm):
 
 Be decisive and ground every conclusion in specific evidence from the analysts.
 
-{NO_EXTERNAL_TOOLS}{get_fund_analysis_instruction(ticker)}{get_language_instruction()}"""
+{NO_EXTERNAL_TOOLS}{get_fund_analysis_instruction(ticker, state)}{get_language_instruction()}"""
 
         final_trade_decision = invoke_structured_or_freetext(
             structured_llm,

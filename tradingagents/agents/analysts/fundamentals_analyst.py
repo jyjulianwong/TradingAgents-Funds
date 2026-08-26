@@ -18,7 +18,7 @@ def create_fundamentals_analyst(llm):
         current_date = state["trade_date"]
         instrument_context = get_instrument_context_from_state(state)
 
-        symbol_list = resolve_isin_ticker_list(ticker)
+        symbol_list = resolve_isin_ticker_list(ticker, state)
         mapped_tickers = symbol_list[1:] if len(symbol_list) > 1 else []
 
         tools = [

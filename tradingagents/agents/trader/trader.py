@@ -38,7 +38,7 @@ def create_trader(llm):
                     "structural, fundamentals-driven drivers of value appreciation or deterioration "
                     "over near-term technical signals or short-term price momentum. "
                     + NO_EXTERNAL_TOOLS
-                    + get_fund_analysis_instruction(company_name)
+                    + get_fund_analysis_instruction(company_name, state)
                     + get_language_instruction()
                 ),
             },

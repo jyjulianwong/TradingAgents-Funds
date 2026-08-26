@@ -251,6 +251,55 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Fund Analyst
+# ---------------------------------------------------------------------------
+
+
+class FundHoldingsAnalysis(BaseModel):
+    """Structured proxy-ticker selection produced by the Fund Analyst.
+
+    The Fund Analyst reads a fund's holdings fact sheet (top positions by
+    weight) and selects a small set of exchange-traded proxy tickers that
+    downstream analysts (Market, Sentiment, Fundamentals) can pull real
+    price/volume/fundamentals/social data for, standing in for the fund
+    itself (which, as an OEIC/ETF, typically has no tradeable volume or
+    corporate financials of its own).
+    """
+
+    proxy_tickers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Ordered list of 1-5 exchange-traded ticker symbols that best represent "
+            "this fund's holdings — e.g. its largest individual positions, or a "
+            "closely-matching sector/index ETF. Empty if the fact sheet does not "
+            "give enough information to pick representative tickers; the caller "
+            "falls back to a static mapping in that case, never fabricate a ticker."
+        ),
+    )
+    rationale: str = Field(
+        default="",
+        description=(
+            "One or two sentences on why these tickers were chosen (e.g. which "
+            "top holdings or sector concentration they represent)."
+        ),
+    )
+
+    @field_validator("proxy_tickers", mode="before")
+    @classmethod
+    def _normalize_tickers(cls, v):
+        if not isinstance(v, list):
+            return v
+        seen: dict[str, None] = {}
+        for item in v:
+            if not isinstance(item, str):
+                continue
+            cleaned = item.strip().upper()
+            if cleaned and cleaned.lower() not in {"none", "n/a", "unknown"}:
+                seen.setdefault(cleaned, None)
+        return list(seen)
+
+
+# ---------------------------------------------------------------------------
 # Sentiment Analyst
 # ---------------------------------------------------------------------------
 

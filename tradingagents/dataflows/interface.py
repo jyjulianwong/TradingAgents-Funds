@@ -18,6 +18,8 @@ from .errors import (
     VendorRateLimitError,
 )
 from .fred import get_macro_data as get_fred_macro_data
+from .hl_fund import get_fund_holdings as get_hl_fund_holdings
+from .mstarpy_fund import get_fund_holdings as get_mstarpy_fund_holdings
 from .polymarket import get_prediction_markets as get_polymarket_prediction_markets
 from .y_finance import (
     get_balance_sheet as get_yfinance_balance_sheet,
@@ -74,6 +76,12 @@ TOOLS_CATEGORIES = {
         "tools": [
             "get_prediction_markets",
         ]
+    },
+    "fund_fact_sheet_data": {
+        "description": "Fund holdings / fact sheet data, keyed by ISIN",
+        "tools": [
+            "get_fund_fact_sheet",
+        ]
     }
 }
 
@@ -82,6 +90,8 @@ VENDOR_LIST = [
     "fred",
     "polymarket",
     "alpha_vantage",
+    "mstarpy",
+    "hl",
 ]
 
 # Optional enrichment categories. These add macro/event context to the news
@@ -89,7 +99,12 @@ VENDOR_LIST = [
 # sentinel instead of aborting the run (a bad LLM-supplied indicator, a missing
 # key, or a network blip should not crash an analysis over flavour data). Core
 # categories (prices, fundamentals, news) still raise so a broken primary is loud.
-OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
+# fund_fact_sheet_data joins this set for a different reason: mstarpy drives a
+# real Chrome session and can legitimately be unavailable in headless/CI
+# environments (see mstarpy_fund.py). The Fund Analyst node's isin_ticker_map
+# fallback is the real safety net; this just keeps a vendor outage from ever
+# raising instead of degrading to a sentinel the node checks for.
+OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets", "fund_fact_sheet_data"}
 
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
@@ -140,6 +155,16 @@ VENDOR_METHODS = {
     # prediction_markets
     "get_prediction_markets": {
         "polymarket": get_polymarket_prediction_markets,
+    },
+    # fund_fact_sheet_data — additional providers plug in here without
+    # touching the Fund Analyst node or the tool. "hl" (Hargreaves Lansdown,
+    # HTML scrape) only covers GB00-domiciled ISINs and declines everything
+    # else instantly (no network call); "mstarpy" (Morningstar via Selenium)
+    # covers any ISIN globally but is slower and Chrome-dependent. Default
+    # chain tries hl first — see default_config.py.
+    "get_fund_fact_sheet": {
+        "mstarpy": get_mstarpy_fund_holdings,
+        "hl": get_hl_fund_holdings,
     },
 }
 

@@ -18,7 +18,7 @@ def create_market_analyst(llm):
         current_date = state["trade_date"]
         instrument_context = get_instrument_context_from_state(state)
 
-        symbol_list = resolve_isin_ticker_list(ticker)
+        symbol_list = resolve_isin_ticker_list(ticker, state)
         mapped_tickers = symbol_list[1:] if len(symbol_list) > 1 else []
 
         tools = [
@@ -54,7 +54,7 @@ def create_market_analyst(llm):
         else:
             isin_note = ""
 
-        fund_note = get_fund_analysis_instruction(ticker)
+        fund_note = get_fund_analysis_instruction(ticker, state)
 
         system_message = (
             """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **8 indicators** that provide complementary insights without redundancy. Categories and each category's indicators are:
