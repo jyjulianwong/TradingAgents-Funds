@@ -269,18 +269,23 @@ class FundHoldingsAnalysis(BaseModel):
     proxy_tickers: list[str] = Field(
         default_factory=list,
         description=(
-            "Ordered list of 1-5 exchange-traded ticker symbols that best represent "
-            "this fund's holdings — e.g. its largest individual positions, or a "
-            "closely-matching sector/index ETF. Empty if the fact sheet does not "
-            "give enough information to pick representative tickers; the caller "
-            "falls back to a static mapping in that case, never fabricate a ticker."
+            "Ordered list of 1-5 exchange-traded ticker symbols that will best inform "
+            "downstream analysts' read on this fund's likely future performance — its "
+            "largest individual holdings, and/or a sector, industry, thematic, or index "
+            "ticker/ETF when that is a more representative signal of the fund's forward "
+            "exposure and intrinsic value than its current top holdings are. Empty if "
+            "the fact sheet does not give enough information to pick representative "
+            "tickers; the caller falls back to a static mapping in that case. Every "
+            "ticker must be real and one you are genuinely confident about — never "
+            "fabricate one, whether holding-derived or thematic."
         ),
     )
     rationale: str = Field(
         default="",
         description=(
-            "One or two sentences on why these tickers were chosen (e.g. which "
-            "top holdings or sector concentration they represent)."
+            "One or two sentences on why these tickers were chosen — e.g. which top "
+            "holdings or sector concentration they represent, or why a thematic/sector "
+            "ticker was preferred over the fund's literal holdings."
         ),
     )
 
