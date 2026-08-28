@@ -411,6 +411,85 @@ class TestFundAnalystAlphaVantageVerification:
 
 
 @pytest.mark.unit
+class TestIsinTickerMapOverride:
+    """isin_ticker_map_override (TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE) makes
+    the Fund Analyst always use the static map, bypassing dynamic
+    resolution entirely."""
+
+    def test_override_uses_static_map_without_touching_fact_sheet_or_llm(self):
+        set_config({
+            "isin_ticker_map_override": True,
+            "isin_ticker_map": {ISIN: ["IWDA.L", "SWRD.L"]},
+        })
+        llm = mock.MagicMock()
+        structured = mock.MagicMock()
+        llm.with_structured_output.return_value = structured
+
+        with (
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+            ) as fact_sheet_mock,
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.search_ticker_symbol"
+            ) as symbol_mock,
+        ):
+            node = create_fund_analyst(llm)
+            result = node(_make_state(ISIN))
+
+        assert result["fund_proxy_tickers"] == ["IWDA.L", "SWRD.L"]
+        assert result["fund_proxy_source"] == "isin_ticker_map override"
+        assert "isin_ticker_map override" in result["fund_report"]
+        fact_sheet_mock.func.assert_not_called()
+        symbol_mock.func.assert_not_called()
+        # bind_structured() itself (chain construction, no API call) still
+        # happens at node-creation time regardless of the override; what
+        # matters is the actual synthesis call is skipped.
+        structured.invoke.assert_not_called()
+
+    def test_override_with_no_map_entry_yields_empty_proxy_list(self):
+        set_config({"isin_ticker_map_override": True, "isin_ticker_map": {}})
+        llm = mock.MagicMock()
+
+        with mock.patch(
+            "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+        ) as fact_sheet_mock:
+            node = create_fund_analyst(llm)
+            result = node(_make_state(ISIN))
+
+        assert result["fund_proxy_tickers"] == []
+        assert result["fund_proxy_source"] == "none"
+        fact_sheet_mock.func.assert_not_called()
+
+    def test_override_false_uses_normal_dynamic_resolution(self):
+        set_config({
+            "isin_ticker_map_override": False,
+            "isin_ticker_map": {ISIN: ["IWDA.L"]},
+        })
+        llm = mock.MagicMock()
+        structured = mock.MagicMock()
+        structured.invoke.return_value = FundHoldingsAnalysis(
+            proxy_tickers=["AAPL"], rationale="dynamic"
+        )
+        llm.with_structured_output.return_value = structured
+
+        with (
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+            ) as fact_sheet_mock,
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.search_ticker_symbol"
+            ) as symbol_mock,
+        ):
+            fact_sheet_mock.func.return_value = "ticker | security_name | weighting_pct\nAAPL | Apple | 5.5"
+            symbol_mock.func.side_effect = _verified_symbol_table
+            node = create_fund_analyst(llm)
+            result = node(_make_state(ISIN))
+
+        assert result["fund_proxy_tickers"] == ["AAPL"]
+        assert result["fund_proxy_source"] == "mstarpy fund holdings"
+
+
+@pytest.mark.unit
 class TestFundHoldingsAnalysisTickerCap:
     """The model is told to aim for 3-5 tickers, but the validator must not
     trust it to honor that limit — it has to enforce the cap itself."""

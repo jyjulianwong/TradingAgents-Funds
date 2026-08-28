@@ -22,6 +22,12 @@ ticker verification can't reach at all (no API key, rate limit, network
 error) is kept as-is, since an unavailable check is not a negative
 verdict.
 
+Setting ``isin_ticker_map_override`` (env: ``TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE``)
+bypasses all of the above unconditionally: no fact-sheet fetch, no LLM
+call, no Alpha Vantage check — every fund ISIN goes straight to the static
+``isin_ticker_map``, for a deployment that wants to run only off that
+curated, human-reviewed list.
+
 The resolved tickers are written to ``state["fund_proxy_tickers"]`` and also
 baked into a refreshed ``state["instrument_context"]`` (overwriting the
 map-only version ``TradingAgentsGraph.resolve_instrument_context`` seeds
@@ -44,6 +50,7 @@ from tradingagents.agents.utils.agent_utils import (
     search_ticker_symbol,
 )
 from tradingagents.agents.utils.structured import NO_EXTERNAL_TOOLS, bind_structured
+from tradingagents.dataflows.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +213,32 @@ def _render_fund_report(
     return "\n".join(lines)
 
 
+def _finalize(
+    ticker: str,
+    state,
+    proxy_tickers: list[str],
+    source: str,
+    rationale: str,
+    fact_sheet: str | None,
+    verification: dict[str, bool | None],
+) -> dict:
+    identity = resolve_instrument_identity(ticker)
+    instrument_context = build_instrument_context(
+        ticker,
+        state.get("asset_type", "stock"),
+        identity,
+        mapped_tickers=proxy_tickers or None,
+    )
+    return {
+        "fund_proxy_tickers": proxy_tickers,
+        "fund_proxy_source": source,
+        "instrument_context": instrument_context,
+        "fund_report": _render_fund_report(
+            ticker, source, proxy_tickers, rationale, fact_sheet, verification
+        ),
+    }
+
+
 def create_fund_analyst(llm):
     """Create the Fund Analyst node for the trading graph."""
     structured_llm = bind_structured(llm, FundHoldingsAnalysis, "Fund Analyst")
@@ -214,6 +247,19 @@ def create_fund_analyst(llm):
         ticker = state["company_of_interest"]
         if not is_isin(ticker):
             return {}
+
+        if get_config().get("isin_ticker_map_override"):
+            # Deterministic and unconditional: no fact-sheet fetch, no LLM
+            # call, no Alpha Vantage check. resolve_isin_ticker_list(ticker)
+            # with no state arg does exactly this static-map lookup.
+            proxy_tickers = resolve_isin_ticker_list(ticker)[1:]
+            source = "isin_ticker_map override" if proxy_tickers else "none"
+            logger.info(
+                "Fund Analyst: isin_ticker_map_override is set — using the "
+                "static map for %r, bypassing dynamic resolution entirely.",
+                ticker,
+            )
+            return _finalize(ticker, state, proxy_tickers, source, "", None, {})
 
         fact_sheet = _fetch_fact_sheet(ticker)
 
@@ -256,21 +302,6 @@ def create_fund_analyst(llm):
             proxy_tickers = resolve_isin_ticker_list(ticker)[1:]
             source = "isin_ticker_map fallback" if proxy_tickers else "none"
 
-        identity = resolve_instrument_identity(ticker)
-        instrument_context = build_instrument_context(
-            ticker,
-            state.get("asset_type", "stock"),
-            identity,
-            mapped_tickers=proxy_tickers or None,
-        )
-
-        return {
-            "fund_proxy_tickers": proxy_tickers,
-            "fund_proxy_source": source,
-            "instrument_context": instrument_context,
-            "fund_report": _render_fund_report(
-                ticker, source, proxy_tickers, rationale, fact_sheet, verification
-            ),
-        }
+        return _finalize(ticker, state, proxy_tickers, source, rationale, fact_sheet, verification)
 
     return fund_analyst_node

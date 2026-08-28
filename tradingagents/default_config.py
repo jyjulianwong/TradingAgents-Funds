@@ -17,6 +17,7 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_MAX_RISK_ROUNDS":      "max_risk_discuss_rounds",
     "TRADINGAGENTS_CHECKPOINT_ENABLED":   "checkpoint_enabled",
     "TRADINGAGENTS_BENCHMARK_TICKER":     "benchmark_ticker",
+    "TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE": "isin_ticker_map_override",
     "TRADINGAGENTS_TEMPERATURE":          "temperature",
     "TRADINGAGENTS_LLM_MAX_RETRIES":      "llm_max_retries",
     # Provider-specific reasoning/thinking knobs (None = each provider's own
@@ -178,7 +179,16 @@ DEFAULT_CONFIG = _apply_env_overrides({
         ".SZ":  "399001.SZ",   # Shenzhen (SZSE Component)
         "":     "SPY",         # default for US-listed tickers (no suffix)
     },
-    # ISIN-to-ticker mapping — static BACKUP only.
+    # When True, the Fund Analyst's dynamic resolution (fact-sheet fetch, LLM
+    # proxy-ticker synthesis, Alpha Vantage verification) is skipped entirely
+    # for every fund ISIN — it goes straight to the static isin_ticker_map
+    # below, unconditionally. Set via TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE
+    # for a deployment that wants to run only off the curated, human-reviewed
+    # map (e.g. to avoid LLM/vendor variability run-to-run, or when neither
+    # mstarpy/hl nor an LLM/Alpha Vantage key is available).
+    "isin_ticker_map_override": False,
+    # ISIN-to-ticker mapping — static BACKUP only (unless the override above
+    # is set, in which case it's the only source used).
     #
     # The Fund Analyst (the graph's first node) tries to derive proxy tickers
     # dynamically for any fund ISIN, from the fund's actual holdings via the
