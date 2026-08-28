@@ -48,3 +48,41 @@ def test_save_reports_defaults_under_results_dir(tmp_path):
     assert out.exists()
     assert out.parent.parent.name == "reports"  # results_dir/reports/AAPL_<stamp>/...
     assert out.parent.name.startswith("AAPL_")
+
+
+@pytest.mark.unit
+def test_fund_report_surfaces_proxy_banner_above_all_sections(tmp_path):
+    state = _state()
+    state["fund_report"] = "**Instrument**: `GB00BVLL5586` (fund ISIN)\n..."
+    state["fund_proxy_tickers"] = ["GDX", "NEM", "GOLD"]
+    state["fund_proxy_source"] = "mstarpy fund holdings"
+
+    out = write_report_tree(state, "GB00BVLL5586", tmp_path)
+    complete = out.read_text()
+
+    banner_pos = complete.index("Proxy instruments analyzed")
+    title_pos = complete.index("Trading Analysis Report")
+    first_section_pos = complete.index("I. Analyst Team Reports")
+    assert title_pos < banner_pos < first_section_pos
+    assert "GDX, NEM, GOLD" in complete
+    assert "mstarpy fund holdings" in complete
+
+
+@pytest.mark.unit
+def test_fund_report_with_no_proxies_found_still_flags_it_prominently(tmp_path):
+    state = _state()
+    state["fund_report"] = "**Instrument**: `GB00XXXXXXXX` (fund ISIN)\n..."
+    state["fund_proxy_tickers"] = []
+
+    out = write_report_tree(state, "GB00XXXXXXXX", tmp_path)
+    complete = out.read_text()
+
+    assert "Proxy instruments analyzed" in complete
+    assert "none found" in complete
+
+
+@pytest.mark.unit
+def test_non_fund_report_has_no_proxy_banner(tmp_path):
+    out = write_report_tree(_state(), "AAPL", tmp_path)
+    complete = out.read_text()
+    assert "Proxy instruments analyzed" not in complete
