@@ -273,11 +273,16 @@ class FundHoldingsAnalysis(BaseModel):
             "downstream analysts' read on this fund's likely future performance — its "
             "largest individual holdings, and/or a sector, industry, thematic, or index "
             "ticker/ETF when that is a more representative signal of the fund's forward "
-            "exposure and intrinsic value than its current top holdings are. Empty if "
-            "the fact sheet does not give enough information to pick representative "
-            "tickers; the caller falls back to a static mapping in that case. Every "
-            "ticker must be real and one you are genuinely confident about — never "
-            "fabricate one, whether holding-derived or thematic."
+            "exposure and intrinsic value than its current top holdings are. Prefer a "
+            "well-known large-cap or sector/index ticker over an obscure, thinly-covered "
+            "one that a holding's own ticker would technically be but is unlikely to turn "
+            "up in a news or social-media search — a slightly less literal match that is "
+            "actually discoverable beats a precise one that returns nothing, as long as it "
+            "still fairly represents the same exposure. Empty if the fact sheet does not "
+            "give enough information to pick representative tickers; the caller falls back "
+            "to a static mapping in that case. Every ticker must be real and one you are "
+            "genuinely confident about — never fabricate one, whether holding-derived or "
+            "thematic."
         ),
     )
     rationale: str = Field(
