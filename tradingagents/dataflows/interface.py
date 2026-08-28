@@ -11,6 +11,7 @@ from .alpha_vantage import (
     get_news as get_alpha_vantage_news,
     get_stock as get_alpha_vantage_stock,
 )
+from .alpha_vantage_symbol_search import get_symbol_matches as get_alpha_vantage_symbol_matches
 from .config import get_config
 from .errors import (
     NoMarketDataError,
@@ -82,6 +83,12 @@ TOOLS_CATEGORIES = {
         "tools": [
             "get_fund_fact_sheet",
         ]
+    },
+    "ticker_symbol_search": {
+        "description": "Ticker/company-name symbol lookup, used to verify Fund Analyst proxy tickers",
+        "tools": [
+            "search_ticker_symbol",
+        ]
     }
 }
 
@@ -104,7 +111,14 @@ VENDOR_LIST = [
 # environments (see mstarpy_fund.py). The Fund Analyst node's isin_ticker_map
 # fallback is the real safety net; this just keeps a vendor outage from ever
 # raising instead of degrading to a sentinel the node checks for.
-OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets", "fund_fact_sheet_data"}
+# ticker_symbol_search is optional for the same reason as fund_fact_sheet_data:
+# it's a best-effort check the Fund Analyst can simply skip (no ALPHA_VANTAGE_API_KEY,
+# rate-limited, network error) without that ever blocking a run — see
+# fund_analyst.py's _verify_ticker, which treats an unreachable vendor as "no
+# verdict" rather than a failure.
+OPTIONAL_CATEGORIES = {
+    "macro_data", "prediction_markets", "fund_fact_sheet_data", "ticker_symbol_search",
+}
 
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
@@ -165,6 +179,12 @@ VENDOR_METHODS = {
     "get_fund_fact_sheet": {
         "mstarpy": get_mstarpy_fund_holdings,
         "hl": get_hl_fund_holdings,
+    },
+    # ticker_symbol_search — Alpha Vantage only for now; additional providers
+    # (e.g. a second symbol-lookup API) can plug in here later the same way
+    # fund_fact_sheet_data grew a second vendor.
+    "search_ticker_symbol": {
+        "alpha_vantage": get_alpha_vantage_symbol_matches,
     },
 }
 

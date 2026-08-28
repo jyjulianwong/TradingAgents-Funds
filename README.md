@@ -8,21 +8,23 @@
 
 Vanilla TradingAgents is built around exchange-listed tickers (`AAPL`, `BTC-USD`, `7203.T`, etc.) — instruments that have live price feeds, social media presence, and financial statement coverage. Mutual funds identified by ISINs (e.g. `GB00B56FW078`) don't fit this mould: they have no exchange-traded price, no StockTwits cashtag, and no income statement on Yahoo Finance.
 
-This extension bridges that gap. The approach:
+This extension bridges that gap by inserting a **Fund Analyst** as the graph's very first node, ahead of every other analyst. The approach:
 
-1. **Look up the fund's top holdings.** For each fund ISIN, a manually-curated mapping in `DEFAULT_CONFIG["isin_ticker_map"]` records the fund's largest constituent holdings (or a liquid ETF proxy for index funds), sourced from fund factsheets and platforms such as Morningstar, Hargreaves Lansdown, and the fund manager's own website. The intent is that these proxy tickers capture the same sector exposure and macro sensitivity as the fund itself.
+1. **Resolve the fund's proxy tickers, dynamically, on every run.** For a fund ISIN, the Fund Analyst fetches a live holdings fact sheet — Hargreaves Lansdown's factsheet pages for GB00-domiciled ISINs (a plain HTML scrape, fast, no browser needed), falling back to Morningstar via `mstarpy` for any ISIN globally (Selenium-driven, slower). An LLM then selects 3-5 exchange-traded proxy tickers from it: the fund's largest holdings, and/or a sector, industry, thematic, or index ticker when that better represents the fund's overall exposure than any single holding does. Every proposed ticker is checked against Alpha Vantage's `SYMBOL_SEARCH` before being trusted (when `ALPHA_VANTAGE_API_KEY` is configured — skipped otherwise); a ticker Alpha Vantage confidently has no record of is dropped. A static, human-curated mapping in `DEFAULT_CONFIG["isin_ticker_map"]` is the fallback — consulted only when the fact sheet is unavailable, the LLM's synthesis comes back empty, or every proposed ticker fails verification. Set `isin_ticker_map_override` (env: `TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE`) to skip dynamic resolution entirely and always use the static map instead — useful for deterministic, run-to-run-stable proxies, or when neither a fact-sheet vendor nor an LLM/Alpha Vantage key is available.
 
-2. **Run the full TradingAgents pipeline on the proxy tickers.** When you pass a fund ISIN as the ticker, `resolve_isin_ticker_list()` expands it to `[ISIN] + [proxy_tickers]`. Each analyst then queries all symbols in the list:
+2. **Run the full TradingAgents pipeline on the proxy tickers.** When you pass a fund ISIN as the ticker, `resolve_isin_ticker_list()` expands it to `[ISIN] + [proxy_tickers]` (the Fund Analyst's resolution, read from `state["fund_proxy_tickers"]`). Each analyst then queries all symbols in the list:
    - The **Market Analyst** fetches OHLCV data and technical indicators (`RSI`, `MACD`, Bollinger Bands, etc.) for every proxy ticker, building a consolidated picture of recent price action.
    - The **Sentiment Analyst** collects news headlines, StockTwits messages, and Reddit posts for the proxy tickers (the ISIN itself returns empty results on social platforms, which is correctly reported rather than fabricated).
    - The **News Analyst** gathers macro news and sector developments relevant to the proxy holdings.
    - The **Fundamentals Analyst** pulls financial statements and valuation metrics for each proxy company.
 
-3. **Synthesise a fund-level view.** The downstream agents (Bull/Bear Researchers, Research Manager, Trader, Risk Debaters, Portfolio Manager) receive all analyst reports with explicit context that the proxy data is representative of the fund. The Portfolio Manager issues the same five-tier rating (`Buy / Overweight / Hold / Underweight / Sell`) as for any other instrument.
+3. **Synthesise a fund-level view.** The downstream agents (Bull/Bear Researchers, Research Manager, Trader, Risk Debaters, Portfolio Manager) receive all analyst reports — including the Fund Analyst's own report of which proxy tickers were used, from which source, and their Alpha Vantage verification status — with explicit context that the proxy data is representative of the fund. The Portfolio Manager issues the same five-tier rating (`Buy / Overweight / Hold / Underweight / Sell`) as for any other instrument. The saved report opens with a callout naming the actual proxy tickers and source used, so a rating is auditable against what was actually analyzed that run.
 
 ## Adding a new fund
 
-Find the fund's top holdings from its factsheet or a fund data platform, then add an entry to `DEFAULT_CONFIG["isin_ticker_map"]` in `tradingagents/default_config.py`:
+Fund ISINs generally need no manual setup: pass the ISIN as the ticker and the Fund Analyst resolves proxy tickers automatically from a live fact sheet on every run (see above). A manual entry in `isin_ticker_map` is only consulted as a fallback — when dynamic resolution has no usable data for that ISIN (no fact-sheet coverage, no Chrome available for the `mstarpy` scrape, or the LLM's synthesis came back empty or entirely unverified) — or unconditionally if you set `isin_ticker_map_override`.
+
+To add a fallback/override entry, find the fund's top holdings from its factsheet or a fund data platform, then add an entry to `DEFAULT_CONFIG["isin_ticker_map"]` in `tradingagents/default_config.py`:
 
 ```python
 "isin_ticker_map": {
@@ -46,13 +48,14 @@ _, decision = ta.propagate("GB00XXXXXXXX", "2026-07-13")
 print(decision)
 ```
 
-If the ISIN has no entry in `isin_ticker_map`, a warning is logged and the raw ISIN is queried as-is (which will return sparse data from most sources).
+If the ISIN has no entry in `isin_ticker_map` *and* dynamic resolution also fails to find anything usable, a warning is logged and the raw ISIN is queried as-is (which will return sparse data from most sources).
 
 ## Limitations
 
-- Proxy holdings are a snapshot in time. Fund compositions change; the mapping must be updated manually to stay current.
-- Technical signals and sentiment belong to the individual holdings, not the fund NAV directly. The analysis is an indirect read — directionally useful, not a precise NAV forecast.
-- Funds with very diffuse holdings (hundreds of equally-weighted positions) are poorly served by a three-ticker proxy. Index-tracking funds map better to a single liquid ETF that tracks the same benchmark.
+- Proxy ticker selection is an LLM judgment call re-run from scratch on every analysis, so it is not guaranteed to be identical between two runs of the same fund. A materially different proxy set between runs will show up in the saved report's proxy-instruments callout; set `isin_ticker_map_override` for fully deterministic, pinned proxies instead.
+- Alpha Vantage verification only catches a ticker that doesn't exist at all — it cannot judge whether a real, verified ticker is actually the *best* representative of the fund. That's still the LLM's judgment call, and verification is skipped entirely without an `ALPHA_VANTAGE_API_KEY`.
+- Technical signals and sentiment belong to the individual proxy holdings, not the fund NAV directly. The analysis is an indirect read — directionally useful, not a precise NAV forecast.
+- Funds with very diffuse holdings (hundreds of equally-weighted positions) are poorly served by a handful of proxy tickers. Index-tracking funds map better to a single liquid ETF that tracks the same benchmark — the Fund Analyst is instructed to prefer that when appropriate, but a manual `isin_ticker_map` entry remains the more reliable choice for these.
 
 ---
 

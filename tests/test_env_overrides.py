@@ -89,6 +89,16 @@ def test_reasoning_effort_defaults_to_none(monkeypatch):
     assert dc.DEFAULT_CONFIG["anthropic_effort"] is None
 
 
+def test_isin_ticker_map_override_defaults_to_false(monkeypatch):
+    dc = _reload_with_env(monkeypatch)
+    assert dc.DEFAULT_CONFIG["isin_ticker_map_override"] is False
+
+
+def test_isin_ticker_map_override_env_var(monkeypatch):
+    dc = _reload_with_env(monkeypatch, TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE="true")
+    assert dc.DEFAULT_CONFIG["isin_ticker_map_override"] is True
+
+
 def test_empty_env_value_is_passthrough(monkeypatch):
     """Empty TRADINGAGENTS_* values must not clobber the built-in default."""
     dc = _reload_with_env(
