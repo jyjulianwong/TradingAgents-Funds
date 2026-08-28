@@ -8,28 +8,28 @@ _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 # of the existing default, so users can keep writing plain strings in
 # their .env file.
 _ENV_OVERRIDES = {
-    "TRADINGAGENTS_LLM_PROVIDER":         "llm_provider",
-    "TRADINGAGENTS_DEEP_THINK_LLM":       "deep_think_llm",
-    "TRADINGAGENTS_QUICK_THINK_LLM":      "quick_think_llm",
-    "TRADINGAGENTS_LLM_BACKEND_URL":      "backend_url",
-    "TRADINGAGENTS_OUTPUT_LANGUAGE":      "output_language",
-    "TRADINGAGENTS_MAX_DEBATE_ROUNDS":    "max_debate_rounds",
-    "TRADINGAGENTS_MAX_RISK_ROUNDS":      "max_risk_discuss_rounds",
-    "TRADINGAGENTS_CHECKPOINT_ENABLED":   "checkpoint_enabled",
-    "TRADINGAGENTS_BENCHMARK_TICKER":     "benchmark_ticker",
-    "TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE": "isin_ticker_map_override",
-    "TRADINGAGENTS_TEMPERATURE":          "temperature",
-    "TRADINGAGENTS_LLM_MAX_RETRIES":      "llm_max_retries",
+    "TRADINGAGENTS_LLM_PROVIDER":               "llm_provider",
+    "TRADINGAGENTS_DEEP_THINK_LLM":             "deep_think_llm",
+    "TRADINGAGENTS_QUICK_THINK_LLM":            "quick_think_llm",
+    "TRADINGAGENTS_LLM_BACKEND_URL":            "backend_url",
+    "TRADINGAGENTS_OUTPUT_LANGUAGE":            "output_language",
+    "TRADINGAGENTS_MAX_DEBATE_ROUNDS":          "max_debate_rounds",
+    "TRADINGAGENTS_MAX_RISK_ROUNDS":            "max_risk_discuss_rounds",
+    "TRADINGAGENTS_CHECKPOINT_ENABLED":         "checkpoint_enabled",
+    "TRADINGAGENTS_BENCHMARK_TICKER":           "benchmark_ticker",
+    "TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE":   "isin_ticker_map_override",
+    "TRADINGAGENTS_TEMPERATURE":                "temperature",
+    "TRADINGAGENTS_LLM_MAX_RETRIES":            "llm_max_retries",
     # Provider-specific reasoning/thinking knobs (None = each provider's own
     # default). Settable here for non-interactive runs; the CLI also offers an
     # interactive choice, which is skipped when the matching var is set.
-    "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":   "google_thinking_level",
-    "TRADINGAGENTS_OPENAI_REASONING_EFFORT": "openai_reasoning_effort",
-    "TRADINGAGENTS_ANTHROPIC_EFFORT":        "anthropic_effort",
+    "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":      "google_thinking_level",
+    "TRADINGAGENTS_OPENAI_REASONING_EFFORT":    "openai_reasoning_effort",
+    "TRADINGAGENTS_ANTHROPIC_EFFORT":           "anthropic_effort",
     # CLI-only presets
-    "TRADINGAGENTS_ANALYSIS_DATE":        "analysis_date",
-    "TRADINGAGENTS_ANALYSTS":             "analysts",
-    "TRADINGAGENTS_ENABLE_VISUALIZER":    "enable_visualizer",
+    "TRADINGAGENTS_ANALYSIS_DATE":              "analysis_date",
+    "TRADINGAGENTS_ANALYSTS":                   "analysts",
+    "TRADINGAGENTS_ENABLE_VISUALIZER":          "enable_visualizer",
 }
 
 
