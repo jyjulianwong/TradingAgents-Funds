@@ -62,9 +62,9 @@ def _format_holdings(isin: str, fund_name: str, holdings: pd.DataFrame) -> str:
     top = holdings.head(_MAX_HOLDINGS_ROWS)
 
     lines = [
-        f"# Fund holdings for {fund_name} (ISIN {isin})",
-        f"# Total holdings: {total} (showing top {len(top)} by weight)",
-        f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"**Fund holdings for {fund_name} (ISIN {isin})**",
+        f"**Total holdings**: {total} (showing top {len(top)} by weight)",
+        f"**Data retrieved on**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "ticker | security_name | weighting_pct",
         "------ | ------------- | -------------",
@@ -73,7 +73,7 @@ def _format_holdings(isin: str, fund_name: str, holdings: pd.DataFrame) -> str:
         ticker = str(row.get("ticker") or "").strip() or "—"
         name = str(row.get("securityName") or "").strip() or "—"
         weighting = row.get("weighting")
-        weighting_fmt = f"{weighting:.2f}" if isinstance(weighting, (int, float)) else "—"
+        weighting_fmt = f"{weighting:.2f}" if isinstance(weighting, int | float) else "—"
         lines.append(f"{ticker} | {name} | {weighting_fmt}")
 
     return "\n".join(lines)

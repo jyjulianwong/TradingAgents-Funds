@@ -89,15 +89,15 @@ def _format_factsheet(isin: str, sel: Selector) -> str:
         raise NoMarketDataError(isin, isin, "page loaded but no holdings/sector data found")
 
     lines = [
-        f"# Fund fact sheet for {fund_name} (ISIN {isin}) — Hargreaves Lansdown",
-        "# Data retrieved live from hl.co.uk",
+        f"**Fund fact sheet for {fund_name} (ISIN {isin}) — Hargreaves Lansdown**",
+        "Data retrieved live from hl.co.uk",
     ]
     if sell or buy:
-        lines.append(f"# Price: sell {sell or '—'}, buy {buy or '—'}")
+        lines.append(f"**Price**: sell {sell or '—'}, buy {buy or '—'}")
     for fact_label in ("Fund size", "Number of holdings", "Fund type"):
         value = _extract_key_fact(sel, fact_label)
         if value:
-            lines.append(f"# {fact_label}: {value}")
+            lines.append(f"**{fact_label}**: {value}")
     lines.append("")
 
     if holdings:
