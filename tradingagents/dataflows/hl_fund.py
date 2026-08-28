@@ -109,6 +109,7 @@ def _format_factsheet(isin: str, sel: Selector) -> str:
         )
         lines.append("")
         lines.append("Top 10 holdings:")
+        lines.append("")
         lines.append("security_name | weighting_pct")
         lines.append("------------- | -------------")
         for name, weight in holdings:
@@ -117,6 +118,7 @@ def _format_factsheet(isin: str, sel: Selector) -> str:
 
     if sectors:
         lines.append("Top 10 sectors:")
+        lines.append("")
         lines.append("sector | weighting_pct")
         lines.append("------ | -------------")
         for name, weight in sectors:
@@ -125,6 +127,7 @@ def _format_factsheet(isin: str, sel: Selector) -> str:
 
     if countries:
         lines.append("Top 10 countries:")
+        lines.append("")
         lines.append("country | weighting_pct")
         lines.append("------- | -------------")
         for name, weight in countries:
