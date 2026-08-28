@@ -60,6 +60,10 @@ class AgentState(MessagesState):
     fund_proxy_tickers: Annotated[
         list[str], "Proxy tickers resolved for a fund ISIN, if any"
     ]
+    fund_proxy_source: Annotated[
+        str, "Where fund_proxy_tickers came from: 'mstarpy fund holdings', "
+        "'isin_ticker_map fallback', or 'none'"
+    ]
     fund_report: Annotated[str, "Report from the Fund Analyst"]
 
     # research step

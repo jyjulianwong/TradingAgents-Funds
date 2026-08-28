@@ -248,3 +248,57 @@ class TestFundAnalystNode:
             result = node(_make_state(ISIN))
 
         assert result["fund_proxy_tickers"] == ["IWDA.L"]
+
+    def test_result_carries_proxy_source_for_dynamic_resolution(self):
+        llm = mock.MagicMock()
+        structured = mock.MagicMock()
+        structured.invoke.return_value = FundHoldingsAnalysis(
+            proxy_tickers=["AAPL", "MSFT"], rationale="Top two holdings by weight."
+        )
+        llm.with_structured_output.return_value = structured
+
+        with mock.patch(
+            "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+        ) as tool_mock:
+            tool_mock.func.return_value = "ticker | security_name | weighting_pct\nAAPL | Apple | 5.5"
+            node = create_fund_analyst(llm)
+            result = node(_make_state(ISIN))
+
+        assert result["fund_proxy_source"] == "mstarpy fund holdings"
+
+    def test_result_carries_proxy_source_for_static_fallback(self):
+        set_config({"isin_ticker_map": {ISIN: ["IWDA.L"]}})
+        llm = mock.MagicMock()
+
+        with mock.patch(
+            "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+        ) as tool_mock:
+            tool_mock.func.side_effect = RuntimeError("boom")
+            node = create_fund_analyst(llm)
+            result = node(_make_state(ISIN))
+
+        assert result["fund_proxy_source"] == "isin_ticker_map fallback"
+
+
+@pytest.mark.unit
+class TestFundHoldingsAnalysisTickerCap:
+    """The model is told to aim for 3-5 tickers, but the validator must not
+    trust it to honor that limit — it has to enforce the cap itself."""
+
+    def test_more_than_five_tickers_is_truncated_to_five(self):
+        result = FundHoldingsAnalysis(
+            proxy_tickers=["AAPL", "MSFT", "GOOG", "AMZN", "NVDA", "META", "TSLA"],
+            rationale="too many",
+        )
+        assert result.proxy_tickers == ["AAPL", "MSFT", "GOOG", "AMZN", "NVDA"]
+
+    def test_dedup_then_cap_keeps_first_five_distinct(self):
+        result = FundHoldingsAnalysis(
+            proxy_tickers=["AAPL", "aapl", "MSFT", "GOOG", "AMZN", "NVDA", "META"],
+            rationale="dupes before cap",
+        )
+        assert result.proxy_tickers == ["AAPL", "MSFT", "GOOG", "AMZN", "NVDA"]
+
+    def test_three_to_five_tickers_pass_through_unchanged(self):
+        result = FundHoldingsAnalysis(proxy_tickers=["GDX", "NEM", "GOLD"], rationale="gold")
+        assert result.proxy_tickers == ["GDX", "NEM", "GOLD"]

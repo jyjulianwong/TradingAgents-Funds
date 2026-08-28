@@ -269,20 +269,23 @@ class FundHoldingsAnalysis(BaseModel):
     proxy_tickers: list[str] = Field(
         default_factory=list,
         description=(
-            "Ordered list of 1-5 exchange-traded ticker symbols that will best inform "
-            "downstream analysts' read on this fund's likely future performance — its "
+            "Ordered list of exchange-traded ticker symbols — aim for 3 to 5, and never "
+            "more than 5 (extras beyond the 5th are dropped) — that will best inform "
+            "downstream analysts' read on this fund's likely future performance: its "
             "largest individual holdings, and/or a sector, industry, thematic, or index "
             "ticker/ETF when that is a more representative signal of the fund's forward "
-            "exposure and intrinsic value than its current top holdings are. Prefer a "
-            "well-known large-cap or sector/index ticker over an obscure, thinly-covered "
-            "one that a holding's own ticker would technically be but is unlikely to turn "
-            "up in a news or social-media search — a slightly less literal match that is "
-            "actually discoverable beats a precise one that returns nothing, as long as it "
-            "still fairly represents the same exposure. Empty if the fact sheet does not "
-            "give enough information to pick representative tickers; the caller falls back "
-            "to a static mapping in that case. Every ticker must be real and one you are "
-            "genuinely confident about — never fabricate one, whether holding-derived or "
-            "thematic."
+            "exposure and intrinsic value than its current top holdings are. Findability "
+            "is a narrow tie-breaker only — swap a holding for a well-known large-cap peer "
+            "or sector/index ticker solely when that holding is so obscure it would return "
+            "essentially no news or social-media coverage on its own, never as a general "
+            "preference for bigger or more familiar names; an accurate, moderately-covered "
+            "holding should stay, and unrelated funds should not converge on the same "
+            "famous tickers just because they are well-known. Fewer than 3 is fine only "
+            "when the fund is narrow/concentrated and 3 distinct representative tickers "
+            "genuinely don't exist. Empty if the fact sheet does not give enough "
+            "information to pick representative tickers; the caller falls back to a static "
+            "mapping in that case. Every ticker must be real and one you are genuinely "
+            "confident about — never fabricate one, whether holding-derived or thematic."
         ),
     )
     rationale: str = Field(
@@ -306,7 +309,10 @@ class FundHoldingsAnalysis(BaseModel):
             cleaned = item.strip().upper()
             if cleaned and cleaned.lower() not in {"none", "n/a", "unknown"}:
                 seen.setdefault(cleaned, None)
-        return list(seen)
+        # Hard cap: the prompt asks for 3-5, but never trust the model to
+        # honor a limit on its own — truncate rather than let a run-away
+        # list dilute downstream analysis.
+        return list(seen)[:5]
 
 
 # ---------------------------------------------------------------------------
