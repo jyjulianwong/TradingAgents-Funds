@@ -145,6 +145,9 @@ DEFAULT_CONFIG = _apply_env_overrides({
         # Chrome, GB00-ISIN-only, instantly declines anything else) then fall
         # back to mstarpy (Morningstar via Selenium, any ISIN, needs Chrome).
         "fund_fact_sheet_data": "hl,mstarpy",
+        # Verifies a Fund Analyst-picked proxy ticker against a live symbol
+        # database; optional (needs ALPHA_VANTAGE_API_KEY) — see fund_analyst.py.
+        "ticker_symbol_search": "alpha_vantage",
     },
     # Tool-level configuration (takes precedence over category-level).
     # "ohlcv_interval" sets the candle interval for every OHLCV fetch

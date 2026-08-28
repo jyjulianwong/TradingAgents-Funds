@@ -13,6 +13,15 @@ tool failure (network error, ISIN not covered, no Chrome available for the
 mstarpy scrape) is a fact, not a judgment call, so it should not depend on
 model behaviour to detect correctly.
 
+Every ticker the LLM proposes is then checked against Alpha Vantage's
+SYMBOL_SEARCH (``_verify_ticker``) — another deterministic, Python-only
+call, never a tool the LLM invokes — before it reaches downstream
+analysts. A ticker Alpha Vantage confidently has no record of is dropped
+(the LLM's "genuinely confident" claim is a claim, not a guarantee); a
+ticker verification can't reach at all (no API key, rate limit, network
+error) is kept as-is, since an unavailable check is not a negative
+verdict.
+
 The resolved tickers are written to ``state["fund_proxy_tickers"]`` and also
 baked into a refreshed ``state["instrument_context"]`` (overwriting the
 map-only version ``TradingAgentsGraph.resolve_instrument_context`` seeds
@@ -32,6 +41,7 @@ from tradingagents.agents.utils.agent_utils import (
     is_isin,
     resolve_instrument_identity,
     resolve_isin_ticker_list,
+    search_ticker_symbol,
 )
 from tradingagents.agents.utils.structured import NO_EXTERNAL_TOOLS, bind_structured
 
@@ -41,7 +51,9 @@ logger = logging.getLogger(__name__)
 # data (see dataflows/interface.py). Checked here, in Python, rather than
 # left for the LLM to notice — the fallback-or-not decision must be
 # deterministic (a network/vendor failure is a fact, not a judgment call).
-_NO_DATA_PREFIXES = ("NO_DATA_AVAILABLE", "DATA_UNAVAILABLE")
+_NO_DATA_PREFIX = "NO_DATA_AVAILABLE"
+_DATA_UNAVAILABLE_PREFIX = "DATA_UNAVAILABLE"
+_NO_DATA_PREFIXES = (_NO_DATA_PREFIX, _DATA_UNAVAILABLE_PREFIX)
 
 
 def _fetch_fact_sheet(isin: str) -> str | None:
@@ -55,6 +67,47 @@ def _fetch_fact_sheet(isin: str) -> str | None:
         logger.info("Fund Analyst: no fact-sheet data for %r: %s", isin, text)
         return None
     return text
+
+
+def _match_symbols(table_text: str) -> set[str]:
+    """Extract the base (pre-suffix) `symbol` column values from a
+    search_ticker_symbol result table, for a loose cross-exchange comparison
+    (Alpha Vantage's own suffix convention, e.g. '.LON', need not match ours,
+    e.g. '.L')."""
+    symbols: set[str] = set()
+    for line in table_text.splitlines():
+        if "|" not in line or line.startswith(("symbol", "------", "**")):
+            continue
+        raw = line.split("|", 1)[0].strip().upper()
+        if raw and raw != "—":
+            symbols.add(raw.split(".")[0])
+    return symbols
+
+
+def _verify_ticker(ticker: str) -> bool | None:
+    """Best-effort Alpha Vantage check for one proxy ticker.
+
+    Returns True when a matching symbol was found, False when the vendor
+    confidently found none (the ticker looks fabricated, mistyped, or
+    delisted), or None when verification could not be performed at all (no
+    ALPHA_VANTAGE_API_KEY, rate limit, network error) — callers must never
+    read None as a negative verdict.
+    """
+    try:
+        text = search_ticker_symbol.func(ticker)
+    except Exception as exc:  # noqa: BLE001 — vendor unavailable, not a verdict
+        logger.info("Fund Analyst: symbol verification errored for %r: %s", ticker, exc)
+        return None
+    if text.startswith(_DATA_UNAVAILABLE_PREFIX):
+        return None
+    if text.startswith(_NO_DATA_PREFIX):
+        return False
+    return ticker.split(".")[0].upper() in _match_symbols(text)
+
+
+def _verify_proxy_tickers(proxy_tickers: list[str]) -> dict[str, bool | None]:
+    """Verify each proposed proxy ticker against Alpha Vantage, independently."""
+    return {ticker: _verify_ticker(ticker) for ticker in proxy_tickers}
 
 
 def _build_prompt(isin: str, fact_sheet: str) -> list[dict[str, str]]:
@@ -122,13 +175,30 @@ def _build_prompt(isin: str, fact_sheet: str) -> list[dict[str, str]]:
 
 
 def _render_fund_report(
-    isin: str, source: str, proxy_tickers: list[str], rationale: str, fact_sheet: str | None
+    isin: str,
+    source: str,
+    proxy_tickers: list[str],
+    rationale: str,
+    fact_sheet: str | None,
+    verification: dict[str, bool | None] | None = None,
 ) -> str:
     lines = [
         f"**Instrument**: `{isin}` (fund ISIN)",
         f"**Proxy source**: {source}",
         f"**Proxy tickers**: {', '.join(proxy_tickers) if proxy_tickers else 'none found'}",
     ]
+    if verification:
+        def _mark(ticker: str, verified: bool | None) -> str:
+            if verified is True:
+                return f"{ticker} (verified — Alpha Vantage)"
+            if verified is False:
+                return f"{ticker} (NOT FOUND on Alpha Vantage — dropped)"
+            return f"{ticker} (unverified — Alpha Vantage unavailable)"
+
+        lines.append(
+            "**Alpha Vantage verification**: "
+            + "; ".join(_mark(t, v) for t, v in verification.items())
+        )
     if rationale:
         lines.extend(["", f"**Rationale**: {rationale}"])
     if fact_sheet:
@@ -160,6 +230,23 @@ def create_fund_analyst(llm):
                     "Fund Analyst: structured synthesis failed for %r: %s", ticker, exc
                 )
 
+        # Verify the LLM's own picks against a live symbol database before
+        # trusting them — its "genuinely confident" claim in the prompt is a
+        # claim, not a guarantee. Only the dynamically-derived path is
+        # checked; the static isin_ticker_map fallback below is a
+        # human-curated, already-reviewed list (see default_config.py) and
+        # doesn't need re-verifying on every run.
+        verification: dict[str, bool | None] = {}
+        if proxy_tickers:
+            verification = _verify_proxy_tickers(proxy_tickers)
+            unverifiable = [t for t in proxy_tickers if verification.get(t) is False]
+            if unverifiable:
+                logger.info(
+                    "Fund Analyst: dropping proxy tickers not found on Alpha "
+                    "Vantage for %r: %s", ticker, unverifiable,
+                )
+                proxy_tickers = [t for t in proxy_tickers if t not in unverifiable]
+
         if proxy_tickers:
             source = "mstarpy fund holdings"
         else:
@@ -182,7 +269,7 @@ def create_fund_analyst(llm):
             "fund_proxy_source": source,
             "instrument_context": instrument_context,
             "fund_report": _render_fund_report(
-                ticker, source, proxy_tickers, rationale, fact_sheet
+                ticker, source, proxy_tickers, rationale, fact_sheet, verification
             ),
         }
 

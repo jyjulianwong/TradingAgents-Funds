@@ -160,6 +160,15 @@ def _make_state(ticker: str, asset_type: str = "stock"):
     }
 
 
+def _verified_symbol_table(query: str) -> str:
+    """A search_ticker_symbol result that verifies `query` itself."""
+    return (
+        "symbol | name | type | region | match_score\n"
+        "------ | ---- | ---- | ------ | -----------\n"
+        f"{query} | Example Corp | Equity | United States | 1.0000"
+    )
+
+
 @pytest.mark.unit
 class TestFundAnalystNode:
     def test_non_isin_ticker_is_a_no_op(self):
@@ -175,10 +184,16 @@ class TestFundAnalystNode:
         )
         llm.with_structured_output.return_value = structured
 
-        with mock.patch(
-            "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
-        ) as tool_mock:
+        with (
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+            ) as tool_mock,
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.search_ticker_symbol"
+            ) as symbol_mock,
+        ):
             tool_mock.func.return_value = "ticker | security_name | weighting_pct\nAAPL | Apple | 5.5"
+            symbol_mock.func.side_effect = _verified_symbol_table
             node = create_fund_analyst(llm)
             result = node(_make_state(ISIN))
 
@@ -186,6 +201,8 @@ class TestFundAnalystNode:
         assert "AAPL" in result["instrument_context"]
         assert "MSFT" in result["instrument_context"]
         assert "mstarpy" in result["fund_report"]
+        assert "AAPL (verified" in result["fund_report"]
+        assert "MSFT (verified" in result["fund_report"]
 
     def test_tool_failure_falls_back_to_static_map(self):
         set_config({"isin_ticker_map": {ISIN: ["IWDA.L", "SWRD.L"]}})
@@ -257,10 +274,16 @@ class TestFundAnalystNode:
         )
         llm.with_structured_output.return_value = structured
 
-        with mock.patch(
-            "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
-        ) as tool_mock:
+        with (
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+            ) as tool_mock,
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.search_ticker_symbol"
+            ) as symbol_mock,
+        ):
             tool_mock.func.return_value = "ticker | security_name | weighting_pct\nAAPL | Apple | 5.5"
+            symbol_mock.func.side_effect = _verified_symbol_table
             node = create_fund_analyst(llm)
             result = node(_make_state(ISIN))
 
@@ -278,6 +301,113 @@ class TestFundAnalystNode:
             result = node(_make_state(ISIN))
 
         assert result["fund_proxy_source"] == "isin_ticker_map fallback"
+
+
+@pytest.mark.unit
+class TestFundAnalystAlphaVantageVerification:
+    """The Fund Analyst checks its own LLM-picked proxy tickers against
+    Alpha Vantage's SYMBOL_SEARCH before trusting them — never as a tool
+    the LLM itself calls, always a deterministic Python-side check."""
+
+    def _run(self, symbol_side_effect, proxy_tickers=("AAPL", "MSFT")):
+        llm = mock.MagicMock()
+        structured = mock.MagicMock()
+        structured.invoke.return_value = FundHoldingsAnalysis(
+            proxy_tickers=list(proxy_tickers), rationale="test"
+        )
+        llm.with_structured_output.return_value = structured
+
+        with (
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+            ) as tool_mock,
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.search_ticker_symbol"
+            ) as symbol_mock,
+        ):
+            tool_mock.func.return_value = "ticker | security_name | weighting_pct\nAAPL | Apple | 5.5"
+            symbol_mock.func.side_effect = symbol_side_effect
+            node = create_fund_analyst(llm)
+            return node(_make_state(ISIN))
+
+    def test_confidently_unmatched_ticker_is_dropped(self):
+        def side_effect(query):
+            if query == "MSFT":
+                return "NO_DATA_AVAILABLE: No usable market data for 'MSFT'."
+            return _verified_symbol_table(query)
+
+        result = self._run(side_effect)
+
+        assert result["fund_proxy_tickers"] == ["AAPL"]
+        assert "NOT FOUND on Alpha Vantage — dropped" in result["fund_report"]
+
+    def test_dropping_all_tickers_falls_back_to_static_map(self):
+        set_config({"isin_ticker_map": {ISIN: ["IWDA.L"]}})
+
+        def side_effect(query):
+            return f"NO_DATA_AVAILABLE: No usable market data for '{query}'."
+
+        result = self._run(side_effect)
+
+        assert result["fund_proxy_tickers"] == ["IWDA.L"]
+        assert result["fund_proxy_source"] == "isin_ticker_map fallback"
+
+    def test_unreachable_vendor_keeps_ticker_unverified(self):
+        def side_effect(query):
+            return f"DATA_UNAVAILABLE: optional ticker_symbol_search could not be retrieved ({query})."
+
+        result = self._run(side_effect)
+
+        assert result["fund_proxy_tickers"] == ["AAPL", "MSFT"]
+        assert "unverified — Alpha Vantage unavailable" in result["fund_report"]
+
+    def test_verification_tolerates_exchange_suffix_mismatch(self):
+        # Our ticker carries a '.L' (LSE) suffix; Alpha Vantage's own table
+        # can use a different convention (e.g. '.LON') for the same symbol —
+        # verification compares base symbols only.
+        def side_effect(query):
+            base = query.split(".")[0]
+            return (
+                "symbol | name | type | region | match_score\n"
+                "------ | ---- | ---- | ------ | -----------\n"
+                f"{base}.LON | Example Corp | Equity | United Kingdom | 0.8"
+            )
+
+        result = self._run(side_effect, proxy_tickers=["ISF.L"])
+
+        assert result["fund_proxy_tickers"] == ["ISF.L"]
+        assert "ISF.L (verified" in result["fund_report"]
+
+    def test_verification_errors_do_not_drop_ticker(self):
+        def side_effect(query):
+            raise RuntimeError("network blip")
+
+        result = self._run(side_effect)
+
+        assert result["fund_proxy_tickers"] == ["AAPL", "MSFT"]
+        assert "unverified — Alpha Vantage unavailable" in result["fund_report"]
+
+    def test_static_fallback_path_is_not_verified(self):
+        # Verification only applies to the LLM's own dynamic picks; the
+        # curated static map is trusted as-is and search_ticker_symbol
+        # must not even be called.
+        set_config({"isin_ticker_map": {ISIN: ["IWDA.L"]}})
+        llm = mock.MagicMock()
+
+        with (
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.get_fund_fact_sheet"
+            ) as tool_mock,
+            mock.patch(
+                "tradingagents.agents.analysts.fund_analyst.search_ticker_symbol"
+            ) as symbol_mock,
+        ):
+            tool_mock.func.side_effect = RuntimeError("boom")
+            node = create_fund_analyst(llm)
+            result = node(_make_state(ISIN))
+
+        assert result["fund_proxy_tickers"] == ["IWDA.L"]
+        symbol_mock.func.assert_not_called()
 
 
 @pytest.mark.unit
