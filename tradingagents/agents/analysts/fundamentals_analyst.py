@@ -10,6 +10,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
     resolve_isin_ticker_list,
 )
+from tradingagents.agents.utils.markdown import ensure_blank_line_before_tables
 
 
 def create_fundamentals_analyst(llm):
@@ -87,7 +88,7 @@ def create_fundamentals_analyst(llm):
         report = ""
 
         if len(result.tool_calls) == 0:
-            report = result.content
+            report = ensure_blank_line_before_tables(result.content)
 
         return {
             "messages": [result],

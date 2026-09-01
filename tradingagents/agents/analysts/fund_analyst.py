@@ -49,6 +49,7 @@ from tradingagents.agents.utils.agent_utils import (
     resolve_isin_ticker_list,
     search_ticker_symbol,
 )
+from tradingagents.agents.utils.markdown import ensure_blank_line_before_tables
 from tradingagents.agents.utils.structured import NO_EXTERNAL_TOOLS, bind_structured
 from tradingagents.dataflows.config import get_config
 
@@ -210,7 +211,7 @@ def _render_fund_report(
         lines.extend(["", f"**Rationale**: {rationale}"])
     if fact_sheet:
         lines.extend(["", "**Fact sheet (mstarpy)**:", fact_sheet])
-    return "\n".join(lines)
+    return ensure_blank_line_before_tables("\n".join(lines))
 
 
 def _finalize(

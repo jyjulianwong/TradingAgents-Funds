@@ -10,6 +10,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_verified_market_snapshot,
     resolve_isin_ticker_list,
 )
+from tradingagents.agents.utils.markdown import ensure_blank_line_before_tables
 
 
 def create_market_analyst(llm):
@@ -124,7 +125,7 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
         report = ""
 
         if len(result.tool_calls) == 0:
-            report = result.content
+            report = ensure_blank_line_before_tables(result.content)
 
         return {
             "messages": [result],
