@@ -3,6 +3,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
     get_language_instruction,
 )
+from tradingagents.agents.utils.markdown import ensure_blank_line_before_tables
 
 
 def create_aggressive_debator(llm):
@@ -44,7 +45,7 @@ Engage actively by addressing any specific concerns raised, refuting the weaknes
 
         response = llm.invoke(prompt)
 
-        argument = f"Aggressive Analyst: {response.content}"
+        argument = f"Aggressive Analyst: {ensure_blank_line_before_tables(response.content)}"
 
         new_risk_debate_state = {
             "history": history + "\n" + argument,

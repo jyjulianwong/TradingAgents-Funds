@@ -9,6 +9,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_news,
     get_prediction_markets,
 )
+from tradingagents.agents.utils.markdown import ensure_blank_line_before_tables
 
 
 def create_news_analyst(llm):
@@ -61,7 +62,7 @@ def create_news_analyst(llm):
         report = ""
 
         if len(result.tool_calls) == 0:
-            report = result.content
+            report = ensure_blank_line_before_tables(result.content)
 
         return {
             "messages": [result],
