@@ -13,8 +13,8 @@ from unittest import mock
 import pytest
 import requests
 
-from tradingagents.dataflows import hl_fund
 from tradingagents.dataflows.errors import NoMarketDataError
+from tradingagents.dataflows.vendors import hl_fund
 
 ISIN = "GB00BJS8SF95"
 SEDOL = "BJS8SF9"

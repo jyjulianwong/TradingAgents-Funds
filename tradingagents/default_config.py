@@ -20,15 +20,14 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE":   "isin_ticker_map_override",
     "TRADINGAGENTS_TEMPERATURE":                "temperature",
     "TRADINGAGENTS_LLM_MAX_RETRIES":            "llm_max_retries",
+    "TRADINGAGENTS_MAX_TOKENS":                 "max_tokens",
     # Provider-specific reasoning/thinking knobs (None = each provider's own
     # default). Settable here for non-interactive runs; the CLI also offers an
     # interactive choice, which is skipped when the matching var is set.
     "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":      "google_thinking_level",
     "TRADINGAGENTS_OPENAI_REASONING_EFFORT":    "openai_reasoning_effort",
     "TRADINGAGENTS_ANTHROPIC_EFFORT":           "anthropic_effort",
-    # CLI-only presets
-    "TRADINGAGENTS_ANALYSIS_DATE":              "analysis_date",
-    "TRADINGAGENTS_ANALYSTS":                   "analysts",
+    # CLI-only preset
     "TRADINGAGENTS_ENABLE_VISUALIZER":          "enable_visualizer",
 }
 
@@ -74,18 +73,17 @@ def _apply_env_overrides(config: dict) -> dict:
 
 
 DEFAULT_CONFIG = _apply_env_overrides({
-    "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
-    "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", os.path.join(_TRADINGAGENTS_HOME, "logs")),
-    "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", os.path.join(_TRADINGAGENTS_HOME, "cache")),
-    "memory_log_path": os.getenv("TRADINGAGENTS_MEMORY_LOG_PATH", os.path.join(_TRADINGAGENTS_HOME, "memory", "trading_memory.md")),
+    "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR") or os.path.join(_TRADINGAGENTS_HOME, "logs"),
+    "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR") or os.path.join(_TRADINGAGENTS_HOME, "cache"),
+    "memory_log_path": os.getenv("TRADINGAGENTS_MEMORY_LOG_PATH") or os.path.join(_TRADINGAGENTS_HOME, "memory", "trading_memory.md"),
     # Optional cap on the number of resolved memory log entries. When set,
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
     # LLM settings
     "llm_provider": "openai",
-    "deep_think_llm": "gpt-5.5",
-    "quick_think_llm": "gpt-5.4-mini",
+    "deep_think_llm": "gpt-6-sol",
+    "quick_think_llm": "gpt-6-luna",
     # When None, each provider's client falls back to its own default endpoint
     # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).
     # The CLI overrides this per provider when the user picks one. Keeping a
@@ -105,6 +103,11 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # provider/SDK at its own default (usually 2). Raise it to ride out bursty
     # 429 throttling on rate-limited deployments instead of aborting a run (#1091).
     "llm_max_retries": None,
+    # Cap on output tokens forwarded to every provider chat client. None leaves
+    # each provider at its own default. Set it to bound a model that emits
+    # unbounded reasoning/output and hangs or trips a gateway idle timeout
+    # (e.g. some deepseek-v4-flash deployments, #1204).
+    "max_tokens": None,
     # Checkpoint/resume: when True, LangGraph saves state after each node
     # so a crashed run can resume from the last successful step.
     "checkpoint_enabled": False,
@@ -166,6 +169,9 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # based on the ticker's exchange suffix. SPY remains the US default
     # so the reflection label keeps reading "Alpha vs SPY" for US tickers
     # while non-US tickers get their regional index automatically.
+    # Trading days after the analysis date over which a decision's outcome is
+    # measured, for reflection and for the backtest figures.
+    "holding_period_days": 5,
     "benchmark_ticker": None,
     "benchmark_map": {
         ".NS":  "^NSEI",       # NSE India (Nifty 50)
@@ -177,6 +183,7 @@ DEFAULT_CONFIG = _apply_env_overrides({
         ".AX":  "^AXJO",       # Australia (ASX 200)
         ".SS":  "000001.SS",   # Shanghai (SSE Composite)
         ".SZ":  "399001.SZ",   # Shenzhen (SZSE Component)
+        ".SA":  "^BVSP",       # B3 Brazil (Ibovespa)
         "":     "SPY",         # default for US-listed tickers (no suffix)
     },
     # When True, the Fund Analyst's dynamic resolution (fact-sheet fetch, LLM
@@ -198,7 +205,7 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # synthesis came back empty. Every downstream agent (analysts, social-media
     # search included) reads whichever list the Fund Analyst resolved, from
     # ``state["fund_proxy_tickers"]``, not this map directly — see
-    # ``resolve_isin_ticker_list`` in agents/utils/agent_utils.py.
+    # ``resolve_isin_ticker_list`` in agents/context.py.
     #
     # Format:
     #   "<ISIN>": ["<TICKER_1>", "<TICKER_2>", ...]
@@ -273,9 +280,6 @@ DEFAULT_CONFIG = _apply_env_overrides({
         # IXC (iShares Global Energy ETF) added as primary global-energy proxy; XOM and SHEL are confirmed top holdings of this 30-position equal-weight global energy fund.
         "GB00B56FW078": ["IXC", "XOM", "SHEL"]
     },
-    # CLI-only settings — consumed by cli/main.py; ignored by the programmatic API.
-    # None means "ask interactively"; a non-None value skips the interactive prompt.
-    "analysis_date": None,      # YYYY-MM-DD string; None → prompt
-    "analysts": None,           # comma-separated analyst keys; None → prompt
+    # CLI-only setting — consumed by cli/run.py; ignored by the programmatic API.
     "enable_visualizer": True,  # False → skip the 3-D visualizer server / browser tab
 })
