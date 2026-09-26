@@ -1,16 +1,21 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from tradingagents.agents.utils.agent_utils import (
+from tradingagents.agents.context import (
     get_autonomous_agent_instruction,
     get_fund_analysis_instruction,
-    get_indicators,
     get_instrument_context_from_state,
     get_language_instruction,
-    get_stock_data,
-    get_verified_market_snapshot,
     resolve_isin_ticker_list,
 )
-from tradingagents.agents.utils.markdown import ensure_blank_line_before_tables
+from tradingagents.agents.markdown import ensure_blank_line_before_tables
+from tradingagents.agents.tools import get_indicators, get_stock_data, get_verified_market_snapshot
+
+# The tools this analyst is offered; its tool node is built from the same tuple.
+TOOLS = (
+    get_stock_data,
+    get_indicators,
+    get_verified_market_snapshot,
+)
 
 
 def create_market_analyst(llm):
@@ -21,12 +26,6 @@ def create_market_analyst(llm):
 
         symbol_list = resolve_isin_ticker_list(ticker, state)
         mapped_tickers = symbol_list[1:] if len(symbol_list) > 1 else []
-
-        tools = [
-            get_stock_data,
-            get_indicators,
-            get_verified_market_snapshot,
-        ]
 
         if mapped_tickers:
             symbols_fmt = ", ".join(f"`{s}`" for s in symbol_list)
@@ -103,8 +102,7 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
                     " Use the provided tools to progress towards answering the question."
                     " If you are unable to fully answer, that's OK; another assistant with different tools"
                     " will help where you left off. Execute what you can to make progress."
-                    " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
-                    " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
+                    " Report what your tools support; another agent decides the trade."
                     " You have access to the following tools: {tool_names}."
                     " Today's date is {current_date}; treat it as 'now' for all analysis and tool-call date ranges. {instrument_context}\n"
                     "{system_message}",
@@ -114,11 +112,11 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
         )
 
         prompt = prompt.partial(system_message=system_message)
-        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
+        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in TOOLS]))
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(instrument_context=instrument_context)
 
-        chain = prompt | llm.bind_tools(tools)
+        chain = prompt | llm.bind_tools(TOOLS)
 
         result = chain.invoke(state["messages"])
 

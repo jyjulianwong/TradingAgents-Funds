@@ -9,7 +9,7 @@ instead of a raw pipe-delimited paragraph.
 
 import pytest
 
-from tradingagents.agents.utils.markdown import ensure_blank_line_before_tables
+from tradingagents.agents.markdown import ensure_blank_line_before_tables
 
 
 @pytest.mark.unit

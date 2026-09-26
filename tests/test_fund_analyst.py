@@ -14,9 +14,9 @@ import pytest
 import tradingagents.dataflows.config as config_module
 import tradingagents.default_config as default_config
 from tradingagents.agents.analysts.fund_analyst import create_fund_analyst
+from tradingagents.agents.context import is_isin, resolve_isin_ticker_list
 from tradingagents.agents.schemas import FundHoldingsAnalysis
-from tradingagents.agents.utils.agent_utils import is_isin, resolve_isin_ticker_list
-from tradingagents.dataflows import interface
+from tradingagents.dataflows import router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.errors import NoMarketDataError
 
@@ -92,7 +92,7 @@ class TestMstarpyFundVendor:
     def test_holdings_formatted_with_ticker_and_weight(self):
         import mstarpy
 
-        from tradingagents.dataflows import mstarpy_fund
+        from tradingagents.dataflows.vendors import mstarpy_fund
 
         fake_fund = mock.Mock()
         fake_fund.name = "Test Fund"
@@ -113,7 +113,7 @@ class TestMstarpyFundVendor:
     def test_no_fund_found_raises_no_market_data_error(self):
         import mstarpy
 
-        from tradingagents.dataflows import mstarpy_fund
+        from tradingagents.dataflows.vendors import mstarpy_fund
 
         with mock.patch.object(mstarpy_fund, "_get_session", return_value=mock.Mock()), \
                 mock.patch.object(
@@ -124,7 +124,7 @@ class TestMstarpyFundVendor:
     def test_empty_holdings_raises_no_market_data_error(self):
         import mstarpy
 
-        from tradingagents.dataflows import mstarpy_fund
+        from tradingagents.dataflows.vendors import mstarpy_fund
 
         fake_fund = mock.Mock()
         fake_fund.holdings.return_value = pd.DataFrame([])
@@ -138,12 +138,12 @@ class TestMstarpyFundVendor:
         # fund_fact_sheet_data is an OPTIONAL_CATEGORIES entry: route_to_vendor
         # must return a DATA_UNAVAILABLE string, never raise, so a Chrome/mstarpy
         # outage can't take down the whole graph run.
-        assert "fund_fact_sheet_data" in interface.OPTIONAL_CATEGORIES
+        assert "fund_fact_sheet_data" in router.OPTIONAL_CATEGORIES
         with mock.patch.dict(
-            interface.VENDOR_METHODS,
+            router.VENDOR_METHODS,
             {"get_fund_fact_sheet": {"mstarpy": mock.Mock(side_effect=RuntimeError("no chrome"))}},
         ):
-            result = interface.route_to_vendor("get_fund_fact_sheet", ISIN)
+            result = router.route_to_vendor("get_fund_fact_sheet", ISIN)
         assert result.startswith("DATA_UNAVAILABLE")
 
 
