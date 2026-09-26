@@ -27,7 +27,9 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":      "google_thinking_level",
     "TRADINGAGENTS_OPENAI_REASONING_EFFORT":    "openai_reasoning_effort",
     "TRADINGAGENTS_ANTHROPIC_EFFORT":           "anthropic_effort",
-    # CLI-only preset
+    # CLI-only presets
+    "TRADINGAGENTS_ANALYSIS_DATE":              "analysis_date",
+    "TRADINGAGENTS_ANALYSTS":                   "analysts",
     "TRADINGAGENTS_ENABLE_VISUALIZER":          "enable_visualizer",
 }
 
@@ -280,6 +282,10 @@ DEFAULT_CONFIG = _apply_env_overrides({
         # IXC (iShares Global Energy ETF) added as primary global-energy proxy; XOM and SHEL are confirmed top holdings of this 30-position equal-weight global energy fund.
         "GB00B56FW078": ["IXC", "XOM", "SHEL"]
     },
-    # CLI-only setting — consumed by cli/run.py; ignored by the programmatic API.
+    # CLI-only settings — consumed by cli/selections.py and cli/run.py; ignored
+    # by the programmatic API. None means "ask interactively"; a non-None value
+    # skips the matching prompt (see the "CLI presets" section in .env.example).
+    "analysis_date": None,      # YYYY-MM-DD string; None → prompt
+    "analysts": None,           # comma-separated analyst keys; None → prompt
     "enable_visualizer": True,  # False → skip the 3-D visualizer server / browser tab
 })

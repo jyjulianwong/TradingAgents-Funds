@@ -12,6 +12,7 @@ from cli.announcements import display_announcements, fetch_announcements
 from cli.display import (
     console,
 )
+from cli.models import AnalystType
 from cli.prefs import load_last_run, sanitize, save_last_run
 from cli.prompts import (
     ask_anthropic_effort,
@@ -24,6 +25,7 @@ from cli.prompts import (
     confirm_ollama_endpoint,
     detect_asset_type,
     ensure_api_key,
+    filter_analysts_for_asset_type,
     get_ticker,
     prompt_openai_compatible_url,
     resolve_backend_url,
@@ -109,16 +111,20 @@ def _prompt_selections(prefs):
             f"[green]Detected asset type:[/green] {asset_type.value}"
         )
 
-    # Step 2: Analysis date
-    default_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    console.print(
-        create_question_box(
-            "Step 2: Analysis Date",
-            "Enter the analysis date (YYYY-MM-DD)",
-            default_date,
+    # Step 2: Analysis date (skipped when set via TRADINGAGENTS_ANALYSIS_DATE)
+    if DEFAULT_CONFIG.get("analysis_date"):
+        analysis_date = DEFAULT_CONFIG["analysis_date"]
+        console.print(f"[green]✓ Analysis date from environment:[/green] {analysis_date}")
+    else:
+        default_date = datetime.datetime.now().strftime("%Y-%m-%d")
+        console.print(
+            create_question_box(
+                "Step 2: Analysis Date",
+                "Enter the analysis date (YYYY-MM-DD)",
+                default_date,
+            )
         )
-    )
-    analysis_date = get_analysis_date()
+        analysis_date = get_analysis_date()
 
     # Step 3: Output language (skipped when set via TRADINGAGENTS_OUTPUT_LANGUAGE)
     if os.environ.get("TRADINGAGENTS_OUTPUT_LANGUAGE"):
@@ -135,17 +141,37 @@ def _prompt_selections(prefs):
         )
         output_language = ask_output_language(prefs.get("output_language"))
 
-    # Step 4: Select analysts
-    console.print(
-        create_question_box(
-            "Step 4: Analysts Team", "Select your LLM analyst agents for the analysis"
-        )
-    )
+    # Step 4: Select analysts (skipped when set via TRADINGAGENTS_ANALYSTS)
     prefs = sanitize(prefs, asset_type.value)
-    selected_analysts = select_analysts(asset_type, prefs.get("analysts"))
-    console.print(
-        f"[green]Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
-    )
+    if DEFAULT_CONFIG.get("analysts"):
+        raw_analysts = DEFAULT_CONFIG["analysts"]
+        valid_values = {a.value for a in AnalystType}
+        parsed = [
+            AnalystType(k.strip().lower())
+            for k in raw_analysts.split(",")
+            if k.strip().lower() in valid_values
+        ]
+        selected_analysts = filter_analysts_for_asset_type(parsed, asset_type)
+        if not selected_analysts:
+            console.print(
+                f"[red]TRADINGAGENTS_ANALYSTS={raw_analysts!r} produced no valid analysts "
+                f"(valid values: {', '.join(sorted(valid_values))}). Exiting.[/red]"
+            )
+            raise SystemExit(1)
+        console.print(
+            f"[green]✓ Analysts from environment:[/green] "
+            f"{', '.join(a.value for a in selected_analysts)}"
+        )
+    else:
+        console.print(
+            create_question_box(
+                "Step 4: Analysts Team", "Select your LLM analyst agents for the analysis"
+            )
+        )
+        selected_analysts = select_analysts(asset_type, prefs.get("analysts"))
+        console.print(
+            f"[green]Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
+        )
 
     # Step 5: Research depth (skipped when both round counts are set via env).
     # Research depth maps to the debate + risk round counts; when both are

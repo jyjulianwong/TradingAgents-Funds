@@ -116,6 +116,81 @@ class TestResearchDepthSkippedFromEnv(unittest.TestCase):
 
 
 @pytest.mark.unit
+class TestAnalysisDateSkippedFromEnv(unittest.TestCase):
+    def test_analysis_date_env_skips_step2_prompt(self):
+
+        env = {"TRADINGAGENTS_ANALYSIS_DATE": "2026-06-26"}
+        fake_cfg = dict(cli_selections.DEFAULT_CONFIG)
+        fake_cfg.update({"analysis_date": "2026-06-26"})
+
+        with mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
+             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
+             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
+             mock.patch.object(cli_selections, "get_analysis_date") as prompt_date, \
+             mock.patch.object(cli_selections, "select_analysts", return_value=[]), \
+             mock.patch.object(cli_selections, "select_research_depth", return_value=1), \
+             mock.patch.object(cli_selections, "ensure_api_key"), \
+             mock.patch.object(cli_selections, "select_llm_provider", return_value=("openai", None)), \
+             mock.patch.object(cli_selections, "ask_output_language", return_value="English"), \
+             mock.patch.object(cli_selections, "select_shallow_thinking_agent", return_value="gpt-5.4-mini"), \
+             mock.patch.object(cli_selections, "select_deep_thinking_agent", return_value="gpt-5.5"), \
+             mock.patch.object(cli_selections, "ask_openai_reasoning_effort", return_value=None):
+            sel = cli_selections.get_user_selections()
+
+        # The analysis-date prompt is skipped; the value comes from the env config.
+        prompt_date.assert_not_called()
+        self.assertEqual(sel["analysis_date"], "2026-06-26")
+
+
+@pytest.mark.unit
+class TestAnalystsSkippedFromEnv(unittest.TestCase):
+    def test_analysts_env_skips_step4_prompt(self):
+
+        env = {"TRADINGAGENTS_ANALYSTS": "market,news"}
+        fake_cfg = dict(cli_selections.DEFAULT_CONFIG)
+        fake_cfg.update({"analysts": "market,news"})
+
+        with mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
+             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
+             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
+             mock.patch.object(cli_selections, "get_analysis_date", return_value="2026-05-29"), \
+             mock.patch.object(cli_selections, "select_analysts") as prompt_analysts, \
+             mock.patch.object(cli_selections, "select_research_depth", return_value=1), \
+             mock.patch.object(cli_selections, "ensure_api_key"), \
+             mock.patch.object(cli_selections, "select_llm_provider", return_value=("openai", None)), \
+             mock.patch.object(cli_selections, "ask_output_language", return_value="English"), \
+             mock.patch.object(cli_selections, "select_shallow_thinking_agent", return_value="gpt-5.4-mini"), \
+             mock.patch.object(cli_selections, "select_deep_thinking_agent", return_value="gpt-5.5"), \
+             mock.patch.object(cli_selections, "ask_openai_reasoning_effort", return_value=None):
+            sel = cli_selections.get_user_selections()
+
+        # The analysts checkbox prompt is skipped; the value comes from the env config.
+        prompt_analysts.assert_not_called()
+        self.assertEqual(
+            sorted(a.value for a in sel["analysts"]), ["market", "news"]
+        )
+
+    def test_invalid_analysts_env_exits(self):
+        env = {"TRADINGAGENTS_ANALYSTS": "not-a-real-analyst"}
+        fake_cfg = dict(cli_selections.DEFAULT_CONFIG)
+        fake_cfg.update({"analysts": "not-a-real-analyst"})
+
+        with mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
+             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
+             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
+             mock.patch.object(cli_selections, "get_analysis_date", return_value="2026-05-29"), \
+             mock.patch.object(cli_selections, "ask_output_language", return_value="English"), \
+             self.assertRaises(SystemExit):
+            cli_selections.get_user_selections()
+
+
+@pytest.mark.unit
 class TestReasoningEffortSkippedFromEnv(unittest.TestCase):
     def test_effort_env_skips_step8_prompt(self):
 
