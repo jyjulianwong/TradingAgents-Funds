@@ -5,7 +5,7 @@ own structured-output call) against a live symbol database, catching a
 hallucinated, mistyped, or delisted ticker before it reaches downstream
 analysts. This is a deterministic, Python-orchestrated check — never a tool
 the LLM invokes itself. Schema-only structured-output calls bind no tools
-(see ``NO_EXTERNAL_TOOLS`` in ``agents/utils/structured.py``), so any lookup
+(see ``NO_EXTERNAL_TOOLS`` in ``agents/structured.py``), so any lookup
 has to happen in plain Python around that call, the same way
 ``get_fund_fact_sheet`` is fetched deterministically before the Fund
 Analyst's structured call runs.
@@ -36,9 +36,7 @@ def get_symbol_matches(query: str) -> str:
     try:
         payload = json.loads(response_text)
     except json.JSONDecodeError as exc:
-        raise NoMarketDataError(
-            query, query, "SYMBOL_SEARCH returned a non-JSON response"
-        ) from exc
+        raise NoMarketDataError(query, query, "SYMBOL_SEARCH returned a non-JSON response") from exc
 
     matches = payload.get("bestMatches") or []
     if not matches:

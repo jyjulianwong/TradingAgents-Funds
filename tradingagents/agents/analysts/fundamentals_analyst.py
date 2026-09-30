@@ -1,5 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
+from tradingagents.agents.analysts.turn import take_turn
 from tradingagents.agents.context import (
     get_autonomous_agent_instruction,
     get_instrument_context_from_state,
@@ -85,14 +86,9 @@ def create_fundamentals_analyst(llm):
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(instrument_context=instrument_context)
 
-        chain = prompt | llm.bind_tools(TOOLS)
-
-        result = chain.invoke(state["messages"])
-
-        report = ""
-
-        if len(result.tool_calls) == 0:
-            report = ensure_blank_line_before_tables(result.content)
+        result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        if report:
+            report = ensure_blank_line_before_tables(report)
 
         return {
             "messages": [result],

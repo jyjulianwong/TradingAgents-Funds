@@ -43,7 +43,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             try:
                 event = await asyncio.wait_for(q.get(), timeout=25.0)
                 await ws.send_json(event)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 try:
                     await ws.send_json({"type": "ping"})
                 except Exception:
@@ -70,6 +70,7 @@ def start(port: int = 7842) -> int:
 
     def _find_free_port(start: int) -> int:
         import socket
+
         for p in range(start, start + 5):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 try:

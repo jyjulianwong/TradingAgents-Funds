@@ -27,6 +27,9 @@ from cli.prompts import (
     ensure_api_key,
     filter_analysts_for_asset_type,
     get_ticker,
+    parse_analysis_date,
+    parse_analysts,
+    parse_ticker,
     prompt_openai_compatible_url,
     resolve_backend_url,
     select_analysts,
@@ -38,15 +41,48 @@ from cli.prompts import (
 from tradingagents.default_config import DEFAULT_CONFIG
 
 
-def get_user_selections():
+def get_user_selections(flags=None):
     """Ask for the run's settings, offering the previous run's answers."""
-    selections = _prompt_selections(load_last_run())
+    selections = _prompt_selections(load_last_run(), flags or {})
     save_last_run(selections)
     return selections
 
 
-def _prompt_selections(prefs):
-    """Walk the selection steps. ``prefs`` prefills, the environment skips."""
+def depth_from_env() -> bool:
+    """Both round counts come from the environment, so the depth question is skipped."""
+    return bool(
+        os.environ.get("TRADINGAGENTS_MAX_DEBATE_ROUNDS")
+        and os.environ.get("TRADINGAGENTS_MAX_RISK_ROUNDS")
+    )
+
+
+def unattended_gaps(flags) -> list[str]:
+    """The flags and environment variables a run with no terminal still needs."""
+    env = os.environ.get
+    gaps = [f"--{name}" for name in ("ticker", "date", "analysts") if flags.get(name) is None]
+    gaps += [f"--{name} or --no-{name}" for name in ("save", "show") if flags.get(name) is None]
+    if not env("TRADINGAGENTS_OUTPUT_LANGUAGE"):
+        gaps.append("TRADINGAGENTS_OUTPUT_LANGUAGE")
+    if not depth_from_env():
+        gaps.append("TRADINGAGENTS_MAX_DEBATE_ROUNDS and TRADINGAGENTS_MAX_RISK_ROUNDS")
+    if not env("TRADINGAGENTS_LLM_PROVIDER"):
+        gaps.append("TRADINGAGENTS_LLM_PROVIDER")
+    if not (env("TRADINGAGENTS_QUICK_THINK_LLM") or env("TRADINGAGENTS_DEEP_THINK_LLM")):
+        gaps.append("TRADINGAGENTS_QUICK_THINK_LLM or TRADINGAGENTS_DEEP_THINK_LLM")
+    return gaps
+
+
+def _from_flag(parse, value, *args):
+    """A flag's value through the same check its prompt applies; a bad one ends the run."""
+    try:
+        return parse(value, *args)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from None
+
+
+def _prompt_selections(prefs, flags):
+    """Walk the selection steps. ``prefs`` prefills; flags and the environment skip."""
     with open(Path(__file__).parent / "static" / "welcome.txt", encoding="utf-8") as f:
         welcome_ascii = f.read()
 
@@ -54,9 +90,7 @@ def _prompt_selections(prefs):
     welcome_content += "[bold green]TradingAgents: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
     welcome_content += "[bold]Workflow Steps:[/bold]\n"
     welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
-    welcome_content += (
-        "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
-    )
+    welcome_content += "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
 
     welcome_box = Panel(
         welcome_content,
@@ -95,26 +129,31 @@ def _prompt_selections(prefs):
         return prompt_fn()
 
     # Step 1: Ticker symbol
-    console.print(
-        create_question_box(
-            "Step 1: Ticker Symbol",
-            "Enter the ticker, with exchange suffix when needed (e.g. SPY, 0700.HK, BTC-USD)",
-            "SPY",
+    if flags.get("ticker") is not None:
+        selected_ticker = _from_flag(parse_ticker, flags["ticker"])
+        console.print(f"[green]✓ Ticker from --ticker:[/green] {selected_ticker}")
+    else:
+        console.print(
+            create_question_box(
+                "Step 1: Ticker Symbol",
+                "Enter the ticker, with exchange suffix when needed (e.g. SPY, 0700.HK, BTC-USD)",
+                "SPY",
+            )
         )
-    )
-    selected_ticker = get_ticker()
+        selected_ticker = get_ticker()
     asset_type = detect_asset_type(selected_ticker)
     # Only announce when it's not the default stock path, to avoid printing
     # "stock" on every run.
     if asset_type.value != "stock":
-        console.print(
-            f"[green]Detected asset type:[/green] {asset_type.value}"
-        )
+        console.print(f"[green]Detected asset type:[/green] {asset_type.value}")
 
-    # Step 2: Analysis date (skipped when set via TRADINGAGENTS_ANALYSIS_DATE)
+    # Step 2: Analysis date (skipped when set via TRADINGAGENTS_ANALYSIS_DATE or --date)
     if DEFAULT_CONFIG.get("analysis_date"):
         analysis_date = DEFAULT_CONFIG["analysis_date"]
         console.print(f"[green]✓ Analysis date from environment:[/green] {analysis_date}")
+    elif flags.get("date") is not None:
+        analysis_date = _from_flag(parse_analysis_date, flags["date"])
+        console.print(f"[green]✓ Analysis date from --date:[/green] {analysis_date}")
     else:
         default_date = datetime.datetime.now().strftime("%Y-%m-%d")
         console.print(
@@ -129,19 +168,17 @@ def _prompt_selections(prefs):
     # Step 3: Output language (skipped when set via TRADINGAGENTS_OUTPUT_LANGUAGE)
     if os.environ.get("TRADINGAGENTS_OUTPUT_LANGUAGE"):
         output_language = DEFAULT_CONFIG["output_language"]
-        console.print(
-            f"[green]✓ Output language from environment:[/green] {output_language}"
-        )
+        console.print(f"[green]✓ Output language from environment:[/green] {output_language}")
     else:
         console.print(
             create_question_box(
                 "Step 3: Output Language",
-                "Select the language for analyst reports and final decision"
+                "Select the language for analyst reports and final decision",
             )
         )
         output_language = ask_output_language(prefs.get("output_language"))
 
-    # Step 4: Select analysts (skipped when set via TRADINGAGENTS_ANALYSTS)
+    # Step 4: Select analysts (skipped when set via TRADINGAGENTS_ANALYSTS or --analysts)
     prefs = sanitize(prefs, asset_type.value)
     if DEFAULT_CONFIG.get("analysts"):
         raw_analysts = DEFAULT_CONFIG["analysts"]
@@ -162,6 +199,12 @@ def _prompt_selections(prefs):
             f"[green]✓ Analysts from environment:[/green] "
             f"{', '.join(a.value for a in selected_analysts)}"
         )
+    elif flags.get("analysts") is not None:
+        selected_analysts = _from_flag(parse_analysts, flags["analysts"], asset_type)
+        console.print(
+            f"[green]✓ Analysts from --analysts:[/green] "
+            f"{', '.join(a.value for a in selected_analysts)}"
+        )
     else:
         console.print(
             create_question_box(
@@ -177,10 +220,7 @@ def _prompt_selections(prefs):
     # Research depth maps to the debate + risk round counts; when both are
     # supplied through TRADINGAGENTS_MAX_DEBATE_ROUNDS / _MAX_RISK_ROUNDS we keep
     # the run non-interactive and honor the env values (#977).
-    depth_from_env = bool(os.environ.get("TRADINGAGENTS_MAX_DEBATE_ROUNDS")) and bool(
-        os.environ.get("TRADINGAGENTS_MAX_RISK_ROUNDS")
-    )
-    if depth_from_env:
+    if depth_from_env():
         selected_research_depth = DEFAULT_CONFIG["max_debate_rounds"]
         console.print(
             f"[green]✓ Research depth from environment:[/green] "
@@ -189,9 +229,7 @@ def _prompt_selections(prefs):
         )
     else:
         console.print(
-            create_question_box(
-                "Step 5: Research Depth", "Select your research depth level"
-            )
+            create_question_box("Step 5: Research Depth", "Select your research depth level")
         )
         selected_research_depth = select_research_depth(prefs.get("research_depth"))
 
@@ -210,11 +248,7 @@ def _prompt_selections(prefs):
         # Still confirm/persist the API key so the run doesn't fail later.
         ensure_api_key(selected_llm_provider)
     else:
-        console.print(
-            create_question_box(
-                "Step 6: LLM Provider", "Select your LLM provider"
-            )
-        )
+        console.print(create_question_box("Step 6: LLM Provider", "Select your LLM provider"))
         selected_llm_provider, backend_url = select_llm_provider(prefs.get("llm_provider"))
 
         # Providers with regional endpoints prompt for the region as a secondary
@@ -236,8 +270,11 @@ def _prompt_selections(prefs):
         # The generic OpenAI-compatible endpoint has no default; ask for it if
         # neither the menu nor the environment supplied one.
         if selected_llm_provider == "openai_compatible" and not backend_url:
-            remembered_url = (prefs.get("backend_url")
-                              if prefs.get("llm_provider") == selected_llm_provider else None)
+            remembered_url = (
+                prefs.get("backend_url")
+                if prefs.get("llm_provider") == selected_llm_provider
+                else None
+            )
             backend_url = prompt_openai_compatible_url(remembered_url)
 
         # For Ollama, surface the resolved endpoint (OLLAMA_BASE_URL vs default)
@@ -251,7 +288,9 @@ def _prompt_selections(prefs):
         ensure_api_key(selected_llm_provider)
 
     # Step 7: Thinking agents (skipped when either model is set via environment)
-    if os.environ.get("TRADINGAGENTS_QUICK_THINK_LLM") or os.environ.get("TRADINGAGENTS_DEEP_THINK_LLM"):
+    if os.environ.get("TRADINGAGENTS_QUICK_THINK_LLM") or os.environ.get(
+        "TRADINGAGENTS_DEEP_THINK_LLM"
+    ):
         selected_shallow_thinker = DEFAULT_CONFIG["quick_think_llm"]
         selected_deep_thinker = DEFAULT_CONFIG["deep_think_llm"]
         console.print(
@@ -288,21 +327,30 @@ def _prompt_selections(prefs):
         anthropic_effort = DEFAULT_CONFIG["anthropic_effort"]
     elif provider_lower == "google":
         thinking_level = thinking_value_or_prompt(
-            "TRADINGAGENTS_GOOGLE_THINKING_LEVEL", "google_thinking_level",
-            "Gemini thinking mode", "Step 8: Thinking Mode",
-            "Configure Gemini thinking mode", ask_gemini_thinking_config,
+            "TRADINGAGENTS_GOOGLE_THINKING_LEVEL",
+            "google_thinking_level",
+            "Gemini thinking mode",
+            "Step 8: Thinking Mode",
+            "Configure Gemini thinking mode",
+            ask_gemini_thinking_config,
         )
     elif provider_lower == "openai":
         reasoning_effort = thinking_value_or_prompt(
-            "TRADINGAGENTS_OPENAI_REASONING_EFFORT", "openai_reasoning_effort",
-            "Reasoning effort", "Step 8: Reasoning Effort",
-            "Configure OpenAI reasoning effort level", ask_openai_reasoning_effort,
+            "TRADINGAGENTS_OPENAI_REASONING_EFFORT",
+            "openai_reasoning_effort",
+            "Reasoning effort",
+            "Step 8: Reasoning Effort",
+            "Configure OpenAI reasoning effort level",
+            ask_openai_reasoning_effort,
         )
     elif provider_lower == "anthropic":
         anthropic_effort = thinking_value_or_prompt(
-            "TRADINGAGENTS_ANTHROPIC_EFFORT", "anthropic_effort",
-            "Claude effort", "Step 8: Effort Level",
-            "Configure Claude effort level", ask_anthropic_effort,
+            "TRADINGAGENTS_ANTHROPIC_EFFORT",
+            "anthropic_effort",
+            "Claude effort",
+            "Step 8: Effort Level",
+            "Configure Claude effort level",
+            ask_anthropic_effort,
         )
 
     return {
@@ -325,17 +373,8 @@ def _prompt_selections(prefs):
 def get_analysis_date():
     """Get the analysis date from user input."""
     while True:
-        date_str = typer.prompt(
-            "", default=datetime.datetime.now().strftime("%Y-%m-%d")
-        )
+        date_str = typer.prompt("", default=datetime.datetime.now().strftime("%Y-%m-%d"))
         try:
-            # Validate date format and ensure it's not in the future
-            analysis_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-            if analysis_date.date() > datetime.datetime.now().date():
-                console.print("[red]Error: Analysis date cannot be in the future[/red]")
-                continue
-            return date_str
-        except ValueError:
-            console.print(
-                "[red]Error: Invalid date format. Please use YYYY-MM-DD[/red]"
-            )
+            return parse_analysis_date(date_str)
+        except ValueError as exc:
+            console.print(f"[red]Error: {exc}[/red]")

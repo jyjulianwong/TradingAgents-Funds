@@ -1,7 +1,7 @@
 """Tests for the shared Markdown-table blank-line normalizer.
 
 Companion to the Fund Analyst table-rendering fix (``dataflows/hl_fund.py``):
-this covers the general-purpose helper in ``agents/utils/markdown.py`` that
+this covers the general-purpose helper in ``agents/markdown.py`` that
 every report-producing agent now runs its LLM output through, so a table
 whose header row directly follows a non-blank line still renders as a table
 instead of a raw pipe-delimited paragraph.

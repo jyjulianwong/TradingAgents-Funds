@@ -15,6 +15,7 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_OUTPUT_LANGUAGE":            "output_language",
     "TRADINGAGENTS_MAX_DEBATE_ROUNDS":          "max_debate_rounds",
     "TRADINGAGENTS_MAX_RISK_ROUNDS":            "max_risk_discuss_rounds",
+    "TRADINGAGENTS_MAX_TOOL_ROUNDS":            "max_tool_rounds",
     "TRADINGAGENTS_CHECKPOINT_ENABLED":         "checkpoint_enabled",
     "TRADINGAGENTS_BENCHMARK_TICKER":           "benchmark_ticker",
     "TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE":   "isin_ticker_map_override",
@@ -74,218 +75,241 @@ def _apply_env_overrides(config: dict) -> dict:
     return config
 
 
-DEFAULT_CONFIG = _apply_env_overrides({
-    "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR") or os.path.join(_TRADINGAGENTS_HOME, "logs"),
-    "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR") or os.path.join(_TRADINGAGENTS_HOME, "cache"),
-    "memory_log_path": os.getenv("TRADINGAGENTS_MEMORY_LOG_PATH") or os.path.join(_TRADINGAGENTS_HOME, "memory", "trading_memory.md"),
-    # Optional cap on the number of resolved memory log entries. When set,
-    # the oldest resolved entries are pruned once this limit is exceeded.
-    # Pending entries are never pruned. None disables rotation entirely.
-    "memory_log_max_entries": None,
-    # LLM settings
-    "llm_provider": "openai",
-    "deep_think_llm": "gpt-6-sol",
-    "quick_think_llm": "gpt-6-luna",
-    # When None, each provider's client falls back to its own default endpoint
-    # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).
-    # The CLI overrides this per provider when the user picks one. Keeping a
-    # provider-specific URL here would leak (e.g. OpenAI's /v1 was previously
-    # being forwarded to Gemini, producing malformed request URLs).
-    "backend_url": None,
-    # Provider-specific thinking configuration
-    "google_thinking_level": None,      # "high", "minimal", etc.
-    "openai_reasoning_effort": None,    # "medium", "high", "low"
-    "anthropic_effort": None,           # "high", "medium", "low"
-    # Sampling temperature, forwarded to every provider when set. None leaves
-    # each provider at its own default. Lower values reduce run-to-run
-    # variation on models that honor it; reasoning models largely ignore it
-    # and no setting makes LLM output bit-identical across runs (see README).
-    "temperature": None,
-    # SDK retry budget forwarded to every provider chat client. None leaves each
-    # provider/SDK at its own default (usually 2). Raise it to ride out bursty
-    # 429 throttling on rate-limited deployments instead of aborting a run (#1091).
-    "llm_max_retries": None,
-    # Cap on output tokens forwarded to every provider chat client. None leaves
-    # each provider at its own default. Set it to bound a model that emits
-    # unbounded reasoning/output and hangs or trips a gateway idle timeout
-    # (e.g. some deepseek-v4-flash deployments, #1204).
-    "max_tokens": None,
-    # Checkpoint/resume: when True, LangGraph saves state after each node
-    # so a crashed run can resume from the last successful step.
-    "checkpoint_enabled": False,
-    # Output language for analyst reports and final decision
-    # Internal agent debate stays in English for reasoning quality
-    "output_language": "English",
-    # Debate and discussion settings
-    "max_debate_rounds": 1,
-    "max_risk_discuss_rounds": 1,
-    "max_recur_limit": 100,
-    # News / data fetching parameters
-    # Increase for longer lookback strategies or to broaden macro coverage;
-    # decrease to reduce token usage in agent prompts.
-    "news_article_limit": 20,             # max articles per ticker (ticker-news)
-    "global_news_article_limit": 10,      # max articles for global/macro news
-    "global_news_lookback_days": 7,       # macro news lookback window
-    # Search queries used by get_global_news for macro headlines. Extend or
-    # replace to broaden geographic / sector coverage.
-    "global_news_queries": [
-        "Federal Reserve interest rates inflation",
-        "S&P 500 earnings GDP economic outlook",
-        "geopolitical risk trade war sanctions",
-        "ECB Bank of England BOJ central bank policy",
-        "oil commodities supply chain energy",
-    ],
-    # Data vendor configuration
-    # Category-level configuration (default for all tools in category).
-    # The configured value is the exact vendor chain — requests are NOT silently
-    # routed to vendors you didn't choose. For ordered fallback, list several,
-    # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
-    "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
-        "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
-        "prediction_markets": "polymarket",  # Options: polymarket (keyless)
-        # "hl,mstarpy": try Hargreaves Lansdown first (plain HTML scrape, no
-        # Chrome, GB00-ISIN-only, instantly declines anything else) then fall
-        # back to mstarpy (Morningstar via Selenium, any ISIN, needs Chrome).
-        "fund_fact_sheet_data": "hl,mstarpy",
-        # Verifies a Fund Analyst-picked proxy ticker against a live symbol
-        # database; optional (needs ALPHA_VANTAGE_API_KEY) — see fund_analyst.py.
-        "ticker_symbol_search": "alpha_vantage",
-    },
-    # Tool-level configuration (takes precedence over category-level).
-    # "ohlcv_interval" sets the candle interval for every OHLCV fetch
-    # (get_stock_data and the indicator data loader). yfinance-style values:
-    #   "1d" (daily, default), "1wk" (weekly), "1mo" (monthly)
-    #   "1h" (hourly, ≤730 days history), "30m", "15m", "5m", "2m", "1m"
-    # Note: Alpha Vantage only supports "1d", "1wk", and "1mo".
-    "tool_vendors": {
-        # Example: "get_stock_data": "alpha_vantage",  # Override category default
-        "ohlcv_interval": "1d",
-    },
-    # Benchmark for alpha calculation in the reflection layer.
-    # ``benchmark_ticker`` (when set) overrides the suffix map for all
-    # tickers; leave it None to use ``benchmark_map`` for auto-detection
-    # based on the ticker's exchange suffix. SPY remains the US default
-    # so the reflection label keeps reading "Alpha vs SPY" for US tickers
-    # while non-US tickers get their regional index automatically.
-    # Trading days after the analysis date over which a decision's outcome is
-    # measured, for reflection and for the backtest figures.
-    "holding_period_days": 5,
-    "benchmark_ticker": None,
-    "benchmark_map": {
-        ".NS":  "^NSEI",       # NSE India (Nifty 50)
-        ".BO":  "^BSESN",      # BSE India (Sensex)
-        ".T":   "^N225",       # Tokyo (Nikkei 225)
-        ".HK":  "^HSI",        # Hong Kong (Hang Seng)
-        ".L":   "^FTSE",       # London (FTSE 100)
-        ".TO":  "^GSPTSE",     # Toronto (TSX Composite)
-        ".AX":  "^AXJO",       # Australia (ASX 200)
-        ".SS":  "000001.SS",   # Shanghai (SSE Composite)
-        ".SZ":  "399001.SZ",   # Shenzhen (SZSE Component)
-        ".SA":  "^BVSP",       # B3 Brazil (Ibovespa)
-        "":     "SPY",         # default for US-listed tickers (no suffix)
-    },
-    # When True, the Fund Analyst's dynamic resolution (fact-sheet fetch, LLM
-    # proxy-ticker synthesis, Alpha Vantage verification) is skipped entirely
-    # for every fund ISIN — it goes straight to the static isin_ticker_map
-    # below, unconditionally. Set via TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE
-    # for a deployment that wants to run only off the curated, human-reviewed
-    # map (e.g. to avoid LLM/vendor variability run-to-run, or when neither
-    # mstarpy/hl nor an LLM/Alpha Vantage key is available).
-    "isin_ticker_map_override": False,
-    # ISIN-to-ticker mapping — static BACKUP only (unless the override above
-    # is set, in which case it's the only source used).
-    #
-    # The Fund Analyst (the graph's first node) tries to derive proxy tickers
-    # dynamically for any fund ISIN, from the fund's actual holdings via the
-    # get_fund_fact_sheet tool (mstarpy/Morningstar). This map is only
-    # consulted when that fails or returns nothing — no mstarpy data for the
-    # ISIN, no Chrome available in the deployment environment, or the LLM's
-    # synthesis came back empty. Every downstream agent (analysts, social-media
-    # search included) reads whichever list the Fund Analyst resolved, from
-    # ``state["fund_proxy_tickers"]``, not this map directly — see
-    # ``resolve_isin_ticker_list`` in agents/context.py.
-    #
-    # Format:
-    #   "<ISIN>": ["<TICKER_1>", "<TICKER_2>", ...]
-    #
-    # Example:
-    #   "IE00B4L5Y983": ["IWDA.L", "SWRD.L"],  # iShares Core MSCI World ETF
-    #   "IE00B3RBWM25": ["VWRL.L"],             # Vanguard FTSE All-World ETF
-    #
-    # If an ISIN is not listed here (and mstarpy also had nothing), a warning
-    # is logged and the ISIN is used as-is (which will typically return empty
-    # results from data vendors and social-media sources alike).
-    "isin_ticker_map": {
-        # Fidelity Index UK P Acc.
-        # FTSE All-Share. ISF.L tracks FTSE 100 (~85% of All-Share by cap), best liquid LSE proxy; no liquid FTSE All-Share ETF exists.
-        "GB00BJS8SF95": ["ISF.L"],
-        # Fidelity Index US P Acc.
-        # S&P 500.
-        "GB00BJS8SH10": ["SPY"],
-        # FP WHEB Sustainability Impact C Acc.
-        # Verified top holdings. Autodesk, Xylem, Ecolab cover resource efficiency, water, environmental services themes; ADSK has larger weight than TE Connectivity.
-        "GB00B8HPRW47": ["ADSK", "XYL", "ECL"],
-        # HSBC American Index Acc C.
-        # S&P 500.
-        "GB00B80QG615": ["SPY"],
-        # iShares Corporate Bond Index S Acc.
-        # iBoxx GBP Non-Gilts proxy.
-        "GB00BN08ZN29": ["SLXX.L"],
-        # iShares Enviro & Low Carbon Tilt Real Estate S Acc.
-        # No liquid low-carbon REIT ETF exists; IWDP.L (FTSE EPRA Nareit Developed Div+) and REET (global REIT) are the best available proxies.
-        "GB00BN091933": ["IWDP.L", "REET"],
-        # iShares Japan Equity Index S Acc.
-        # FTSE Japan.
-        "GB00BN08ZG51": ["EWJ"],
-        # iShares Pacific ex Japan Equity Index S Acc.
-        "GB00BN08ZQ59": ["EPP"],
-        # L&G European Index C Acc.
-        # FTSE World Europe ex UK. VGK (Vanguard FTSE Developed Europe ETF) is FTSE-family and highly liquid; replaces ROG.SW/NOVN.SW which are Swiss-listed with higher data-gap risk; ASML retained as the fund's largest holding.
-        "GB00BG0QP042": ["VGK", "ASML"],
-        # L&G Future World ESG Tilted & Opt Emerging Markets C Acc.
-        # ESGE (iShares ESG Aware MSCI EM ETF) has correct ESG tilt; EEM had no ESG screens.
-        "GB00BL6C2119": ["ESGE"],
-        # L&G Future World ESG Tilted & Opt Developed C Acc.
-        "GB00BMFXWS95": ["IWDA.L"],
-        # L&G Global Technology Index Trust C Acc.
-        # FTSE World Technology. IXN tracks S&P Global 1200 IT (genuinely global); VGT/QQQ are US-only or mixed-sector.
-        "GB00BJLP1W53": ["IXN"],
-        # abrdn Global REIT Tracker N Acc.
-        # FTSE EPRA Nareit Developed.
-        "GB00BK5HLJ16": ["IWDP.L"],
-        # AXA Framlington Biotech Z Acc.
-        # IBB (iShares Nasdaq Biotech) top holdings (VRTX, AMGN, Gilead) match fund's actual holdings; reduces idiosyncratic single-stock noise vs 3 individual names.
-        "GB00B784NS11": ["IBB"],
-        # AXA Framlington Health Z Acc.
-        # IXJ (iShares Global Healthcare) covers ~110 global healthcare leaders; XLV is US-only, unsuitable for a global-mandate fund.
-        "GB00B6WZJX05": ["IXJ"],
-        # Barings Global Agriculture I Acc.
-        # MOO (VanEck Agribusiness ETF) covers full global agribusiness value chain (seeds, fertilisers, equipment, food processing); CTVA/NTR/MOS were too US-heavy and fertiliser-narrow.
-        "GB00B3B9VD63": ["MOO"],
-        # BlackRock Natural Resources D Acc.
-        # GNR (SPDR S&P Global Natural Resources ETF) top holdings (Shell, BHP, Exxon, Glencore, FCX) closely mirror fund composition; WPM (precious-metals royalty streamer) was an outlier driving unrepresentative bear signals.
-        "GB00B6865B79": ["GNR"],
-        # JPMorgan Natural Resources C Acc.
-        # GNR captures broad global natural resources; XOM adds energy weighting; NEM (gold miner) removed as it introduced gold-specific bias unrepresentative of the fund.
-        "GB00B88MP089": ["GNR", "XOM"],
-        # Ninety One Global Gold B Inc.
-        # GDX (VanEck Gold Miners ETF) added as primary sector ETF; NEM and GOLD are verified top-2 holdings of this ~25-stock concentrated fund.
-        "GB00BVLL5586": ["GDX", "NEM", "GOLD"],
-        # Schroder Global Healthcare Z Acc.
-        # IXJ (iShares Global Healthcare) provides global coverage; JNJ/LLY/UNH were US-biased, missing European pharma exposure.
-        "GB00B76V7Q08": ["IXJ"],
-        # WS Guinness Global Energy I Acc.
-        # IXC (iShares Global Energy ETF) added as primary global-energy proxy; XOM and SHEL are confirmed top holdings of this 30-position equal-weight global energy fund.
-        "GB00B56FW078": ["IXC", "XOM", "SHEL"]
-    },
-    # CLI-only settings — consumed by cli/selections.py and cli/run.py; ignored
-    # by the programmatic API. None means "ask interactively"; a non-None value
-    # skips the matching prompt (see the "CLI presets" section in .env.example).
-    "analysis_date": None,      # YYYY-MM-DD string; None → prompt
-    "analysts": None,           # comma-separated analyst keys; None → prompt
-    "enable_visualizer": True,  # False → skip the 3-D visualizer server / browser tab
-})
+def build_default_config() -> dict:
+    """The built-in defaults with the TRADINGAGENTS_* environment folded in.
+
+    Read when the package is imported, as DEFAULT_CONFIG; call it again to see
+    the environment as it is now.
+    """
+    return _apply_env_overrides({
+        "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR") or os.path.join(_TRADINGAGENTS_HOME, "logs"),
+        "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR") or os.path.join(_TRADINGAGENTS_HOME, "cache"),
+        "memory_log_path": os.getenv("TRADINGAGENTS_MEMORY_LOG_PATH") or os.path.join(_TRADINGAGENTS_HOME, "memory", "trading_memory.md"),
+        # Optional cap on the number of resolved memory log entries. When set,
+        # the oldest resolved entries are pruned once this limit is exceeded.
+        # Pending entries are never pruned. None disables rotation entirely.
+        "memory_log_max_entries": None,
+        # LLM settings
+        "llm_provider": "openai",
+        "deep_think_llm": "gpt-6-sol",
+        "quick_think_llm": "gpt-6-luna",
+        # When None, each provider's client falls back to its own default endpoint
+        # (api.openai.com for OpenAI, generativelanguage.googleapis.com for Gemini, ...).
+        # The CLI overrides this per provider when the user picks one. Keeping a
+        # provider-specific URL here would leak (e.g. OpenAI's /v1 was previously
+        # being forwarded to Gemini, producing malformed request URLs).
+        "backend_url": None,
+        # Provider-specific thinking configuration
+        "google_thinking_level": None,      # "high", "minimal", etc.
+        "openai_reasoning_effort": None,    # "medium", "high", "low"
+        "anthropic_effort": None,           # "high", "medium", "low"
+        # Sampling temperature, forwarded to every provider when set. None leaves
+        # each provider at its own default. Lower values reduce run-to-run
+        # variation on models that honor it; reasoning models largely ignore it
+        # and no setting makes LLM output bit-identical across runs (see README).
+        "temperature": None,
+        # SDK retry budget forwarded to every provider chat client. None leaves each
+        # provider/SDK at its own default (usually 2). Raise it to ride out bursty
+        # 429 throttling on rate-limited deployments instead of aborting a run (#1091).
+        "llm_max_retries": None,
+        # Cap on output tokens forwarded to every provider chat client. None leaves
+        # each provider at its own default. Set it to bound a model that emits
+        # unbounded reasoning/output and hangs or trips a gateway idle timeout
+        # (e.g. some deepseek-v4-flash deployments, #1204).
+        "max_tokens": None,
+        # Checkpoint/resume: when True, LangGraph saves state after each node
+        # so a crashed run can resume from the last successful step.
+        "checkpoint_enabled": False,
+        # Output language for analyst reports and final decision
+        # Internal agent debate stays in English for reasoning quality
+        "output_language": "English",
+        # Debate and discussion settings
+        "max_debate_rounds": 1,
+        "max_risk_discuss_rounds": 1,
+        "max_recur_limit": 100,
+        # Rounds of tool calls an analyst may make before it is asked for its report.
+        "max_tool_rounds": 20,
+        # News / data fetching parameters
+        # Increase for longer lookback strategies or to broaden macro coverage;
+        # decrease to reduce token usage in agent prompts.
+        "news_article_limit": 20,             # max articles per ticker (ticker-news)
+        "global_news_article_limit": 10,      # max articles for global/macro news
+        "global_news_lookback_days": 7,       # macro news lookback window
+        # Search queries used by get_global_news for macro headlines. Extend or
+        # replace to broaden geographic / sector coverage.
+        "global_news_queries": [
+            "Federal Reserve interest rates inflation",
+            "S&P 500 earnings GDP economic outlook",
+            "geopolitical risk trade war sanctions",
+            "ECB Bank of England BOJ central bank policy",
+            "oil commodities supply chain energy",
+        ],
+        # Data vendor configuration
+        # Category-level configuration (default for all tools in category).
+        # The configured value is the exact vendor chain — requests are NOT silently
+        # routed to vendors you didn't choose. For ordered fallback, list several,
+        # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
+        "data_vendors": {
+            "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
+            "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
+            # Statements come from SEC EDGAR as filed (US filers), then Yahoo; the
+            # overview and insider tools, which SEC EDGAR does not serve, from Yahoo.
+            "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance
+            "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+            "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
+            "prediction_markets": "polymarket",  # Options: polymarket (keyless)
+            # "hl,mstarpy": try Hargreaves Lansdown first (plain HTML scrape, no
+            # Chrome, GB00-ISIN-only, instantly declines anything else) then fall
+            # back to mstarpy (Morningstar via Selenium, any ISIN, needs Chrome).
+            "fund_fact_sheet_data": "hl,mstarpy",
+            # Verifies a Fund Analyst-picked proxy ticker against a live symbol
+            # database; optional (needs ALPHA_VANTAGE_API_KEY) — see fund_analyst.py.
+            "ticker_symbol_search": "alpha_vantage",
+        },
+        # Tool-level configuration (takes precedence over category-level).
+        # "ohlcv_interval" sets the candle interval for every OHLCV fetch
+        # (get_stock_data and the indicator data loader). yfinance-style values:
+        #   "1d" (daily, default), "1wk" (weekly), "1mo" (monthly)
+        #   "1h" (hourly, ≤730 days history), "30m", "15m", "5m", "2m", "1m"
+        # Note: Alpha Vantage only supports "1d", "1wk", and "1mo".
+        "tool_vendors": {
+            # Example: "get_stock_data": "alpha_vantage",  # Override category default
+            "ohlcv_interval": "1d",
+        },
+        # Benchmark for alpha calculation in the reflection layer.
+        # ``benchmark_ticker`` (when set) overrides the suffix map for all
+        # tickers; leave it None to use ``benchmark_map`` for auto-detection
+        # based on the ticker's exchange suffix. SPY remains the US default
+        # so the reflection label keeps reading "Alpha vs SPY" for US tickers
+        # while non-US tickers get their regional index automatically.
+        # Trading days after the analysis date over which a decision's outcome is
+        # measured, for reflection and for the backtest figures.
+        "holding_period_days": 5,
+        "benchmark_ticker": None,
+        "benchmark_map": {
+            ".NS":  "^NSEI",       # NSE India (Nifty 50)
+            ".BO":  "^BSESN",      # BSE India (Sensex)
+            ".T":   "^N225",       # Tokyo (Nikkei 225)
+            ".TW":  "^TWII",       # Taiwan (TAIEX)
+            ".TWO": "^TWII",       # Taipei OTC (TPEx has no Yahoo index; TAIEX)
+            ".KS":  "^KS11",       # Korea (KOSPI)
+            ".KQ":  "^KQ11",       # Korea (KOSDAQ)
+            ".HK":  "^HSI",        # Hong Kong (Hang Seng)
+            ".SI":  "^STI",        # Singapore (Straits Times)
+            ".L":   "^FTSE",       # London (FTSE 100)
+            ".DE":  "^GDAXI",      # Germany (DAX)
+            ".PA":  "^FCHI",       # Paris (CAC 40)
+            ".AS":  "^AEX",        # Amsterdam (AEX)
+            ".SW":  "^SSMI",       # Switzerland (SMI)
+            ".MI":  "FTSEMIB.MI",  # Milan (FTSE MIB)
+            ".TO":  "^GSPTSE",     # Toronto (TSX Composite)
+            ".AX":  "^AXJO",       # Australia (ASX 200)
+            ".SS":  "000001.SS",   # Shanghai (SSE Composite)
+            ".SZ":  "399001.SZ",   # Shenzhen (SZSE Component)
+            ".SA":  "^BVSP",       # B3 Brazil (Ibovespa)
+            "":     "SPY",         # default for US-listed tickers (no suffix)
+        },
+        # When True, the Fund Analyst's dynamic resolution (fact-sheet fetch, LLM
+        # proxy-ticker synthesis, Alpha Vantage verification) is skipped entirely
+        # for every fund ISIN — it goes straight to the static isin_ticker_map
+        # below, unconditionally. Set via TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE
+        # for a deployment that wants to run only off the curated, human-reviewed
+        # map (e.g. to avoid LLM/vendor variability run-to-run, or when neither
+        # mstarpy/hl nor an LLM/Alpha Vantage key is available).
+        "isin_ticker_map_override": False,
+        # ISIN-to-ticker mapping — static BACKUP only (unless the override above
+        # is set, in which case it's the only source used).
+        #
+        # The Fund Analyst (the graph's first node) tries to derive proxy tickers
+        # dynamically for any fund ISIN, from the fund's actual holdings via the
+        # get_fund_fact_sheet tool (mstarpy/Morningstar). This map is only
+        # consulted when that fails or returns nothing — no mstarpy data for the
+        # ISIN, no Chrome available in the deployment environment, or the LLM's
+        # synthesis came back empty. Every downstream agent (analysts, social-media
+        # search included) reads whichever list the Fund Analyst resolved, from
+        # ``state["fund_proxy_tickers"]``, not this map directly — see
+        # ``resolve_isin_ticker_list`` in agents/context.py.
+        #
+        # Format:
+        #   "<ISIN>": ["<TICKER_1>", "<TICKER_2>", ...]
+        #
+        # Example:
+        #   "IE00B4L5Y983": ["IWDA.L", "SWRD.L"],  # iShares Core MSCI World ETF
+        #   "IE00B3RBWM25": ["VWRL.L"],             # Vanguard FTSE All-World ETF
+        #
+        # If an ISIN is not listed here (and mstarpy also had nothing), a warning
+        # is logged and the ISIN is used as-is (which will typically return empty
+        # results from data vendors and social-media sources alike).
+        "isin_ticker_map": {
+            # Fidelity Index UK P Acc.
+            # FTSE All-Share. ISF.L tracks FTSE 100 (~85% of All-Share by cap), best liquid LSE proxy; no liquid FTSE All-Share ETF exists.
+            "GB00BJS8SF95": ["ISF.L"],
+            # Fidelity Index US P Acc.
+            # S&P 500.
+            "GB00BJS8SH10": ["SPY"],
+            # FP WHEB Sustainability Impact C Acc.
+            # Verified top holdings. Autodesk, Xylem, Ecolab cover resource efficiency, water, environmental services themes; ADSK has larger weight than TE Connectivity.
+            "GB00B8HPRW47": ["ADSK", "XYL", "ECL"],
+            # HSBC American Index Acc C.
+            # S&P 500.
+            "GB00B80QG615": ["SPY"],
+            # iShares Corporate Bond Index S Acc.
+            # iBoxx GBP Non-Gilts proxy.
+            "GB00BN08ZN29": ["SLXX.L"],
+            # iShares Enviro & Low Carbon Tilt Real Estate S Acc.
+            # No liquid low-carbon REIT ETF exists; IWDP.L (FTSE EPRA Nareit Developed Div+) and REET (global REIT) are the best available proxies.
+            "GB00BN091933": ["IWDP.L", "REET"],
+            # iShares Japan Equity Index S Acc.
+            # FTSE Japan.
+            "GB00BN08ZG51": ["EWJ"],
+            # iShares Pacific ex Japan Equity Index S Acc.
+            "GB00BN08ZQ59": ["EPP"],
+            # L&G European Index C Acc.
+            # FTSE World Europe ex UK. VGK (Vanguard FTSE Developed Europe ETF) is FTSE-family and highly liquid; replaces ROG.SW/NOVN.SW which are Swiss-listed with higher data-gap risk; ASML retained as the fund's largest holding.
+            "GB00BG0QP042": ["VGK", "ASML"],
+            # L&G Future World ESG Tilted & Opt Emerging Markets C Acc.
+            # ESGE (iShares ESG Aware MSCI EM ETF) has correct ESG tilt; EEM had no ESG screens.
+            "GB00BL6C2119": ["ESGE"],
+            # L&G Future World ESG Tilted & Opt Developed C Acc.
+            "GB00BMFXWS95": ["IWDA.L"],
+            # L&G Global Technology Index Trust C Acc.
+            # FTSE World Technology. IXN tracks S&P Global 1200 IT (genuinely global); VGT/QQQ are US-only or mixed-sector.
+            "GB00BJLP1W53": ["IXN"],
+            # abrdn Global REIT Tracker N Acc.
+            # FTSE EPRA Nareit Developed.
+            "GB00BK5HLJ16": ["IWDP.L"],
+            # AXA Framlington Biotech Z Acc.
+            # IBB (iShares Nasdaq Biotech) top holdings (VRTX, AMGN, Gilead) match fund's actual holdings; reduces idiosyncratic single-stock noise vs 3 individual names.
+            "GB00B784NS11": ["IBB"],
+            # AXA Framlington Health Z Acc.
+            # IXJ (iShares Global Healthcare) covers ~110 global healthcare leaders; XLV is US-only, unsuitable for a global-mandate fund.
+            "GB00B6WZJX05": ["IXJ"],
+            # Barings Global Agriculture I Acc.
+            # MOO (VanEck Agribusiness ETF) covers full global agribusiness value chain (seeds, fertilisers, equipment, food processing); CTVA/NTR/MOS were too US-heavy and fertiliser-narrow.
+            "GB00B3B9VD63": ["MOO"],
+            # BlackRock Natural Resources D Acc.
+            # GNR (SPDR S&P Global Natural Resources ETF) top holdings (Shell, BHP, Exxon, Glencore, FCX) closely mirror fund composition; WPM (precious-metals royalty streamer) was an outlier driving unrepresentative bear signals.
+            "GB00B6865B79": ["GNR"],
+            # JPMorgan Natural Resources C Acc.
+            # GNR captures broad global natural resources; XOM adds energy weighting; NEM (gold miner) removed as it introduced gold-specific bias unrepresentative of the fund.
+            "GB00B88MP089": ["GNR", "XOM"],
+            # Ninety One Global Gold B Inc.
+            # GDX (VanEck Gold Miners ETF) added as primary sector ETF; NEM and GOLD are verified top-2 holdings of this ~25-stock concentrated fund.
+            "GB00BVLL5586": ["GDX", "NEM", "GOLD"],
+            # Schroder Global Healthcare Z Acc.
+            # IXJ (iShares Global Healthcare) provides global coverage; JNJ/LLY/UNH were US-biased, missing European pharma exposure.
+            "GB00B76V7Q08": ["IXJ"],
+            # WS Guinness Global Energy I Acc.
+            # IXC (iShares Global Energy ETF) added as primary global-energy proxy; XOM and SHEL are confirmed top holdings of this 30-position equal-weight global energy fund.
+            "GB00B56FW078": ["IXC", "XOM", "SHEL"]
+        },
+        # CLI-only settings — consumed by cli/selections.py and cli/run.py; ignored
+        # by the programmatic API. None means "ask interactively"; a non-None value
+        # skips the matching prompt (see the "CLI presets" section in .env.example).
+        "analysis_date": None,      # YYYY-MM-DD string; None → prompt
+        "analysts": None,           # comma-separated analyst keys; None → prompt
+        "enable_visualizer": True,  # False → skip the 3-D visualizer server / browser tab
+    })
+
+
+DEFAULT_CONFIG = build_default_config()

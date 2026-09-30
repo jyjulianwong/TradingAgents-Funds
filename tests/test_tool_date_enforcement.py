@@ -22,13 +22,16 @@ TRADE_DATE = "2026-08-14"
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("requested, expected", [
-    ("2026-09-14", TRADE_DATE),     # later than the run: clamped
-    ("2026-08-01", "2026-08-01"),   # earlier: narrows, allowed
-    (None, TRADE_DATE),             # omitted
-    ("Sept 1", TRADE_DATE),         # unparseable
-    ("", TRADE_DATE),
-])
+@pytest.mark.parametrize(
+    "requested, expected",
+    [
+        ("2026-09-14", TRADE_DATE),  # later than the run: clamped
+        ("2026-08-01", "2026-08-01"),  # earlier: narrows, allowed
+        (None, TRADE_DATE),  # omitted
+        ("Sept 1", TRADE_DATE),  # unparseable
+        ("", TRADE_DATE),
+    ],
+)
 def test_as_of_takes_the_earlier_date(requested, expected):
     assert as_of(requested, TRADE_DATE) == expected
 
@@ -39,11 +42,18 @@ def test_as_of_without_a_trade_date_passes_the_request_through():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("start, end, expected", [
-    ("2026-08-01", "2026-09-14", ("2026-08-01", TRADE_DATE)),  # end clamped
-    ("2026-08-01", "2026-08-10", ("2026-08-01", "2026-08-10")),  # inside: unchanged
-    ("2026-09-01", "2026-09-08", ("2026-08-07", TRADE_DATE)),  # wholly later: span kept, moved back
-])
+@pytest.mark.parametrize(
+    "start, end, expected",
+    [
+        ("2026-08-01", "2026-09-14", ("2026-08-01", TRADE_DATE)),  # end clamped
+        ("2026-08-01", "2026-08-10", ("2026-08-01", "2026-08-10")),  # inside: unchanged
+        (
+            "2026-09-01",
+            "2026-09-08",
+            ("2026-08-07", TRADE_DATE),
+        ),  # wholly later: span kept, moved back
+    ],
+)
 def test_as_of_window(start, end, expected):
     assert as_of_window(start, end, TRADE_DATE) == expected
 
@@ -68,8 +78,39 @@ def test_trade_date_is_hidden_from_the_model(tool):
     assert "trade_date" not in tool.tool_call_schema.model_json_schema()["properties"]
 
 
+INSTRUMENT_TOOLS = [
+    tools.get_stock_data,
+    tools.get_indicators,
+    tools.get_verified_market_snapshot,
+    tools.get_fundamentals,
+    tools.get_balance_sheet,
+    tools.get_cashflow,
+    tools.get_income_statement,
+    tools.get_news,
+    tools.get_insider_transactions,
+]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("tool", INSTRUMENT_TOOLS, ids=lambda t: t.name)
+def test_the_instrument_is_hidden_from_the_model(tool):
+    """The model once passed an indicator name as the symbol ("rsi", "atr" are
+    real tickers), and another company's data reached the report."""
+    properties = tool.tool_call_schema.model_json_schema()["properties"]
+    assert "symbol" not in properties and "ticker" not in properties
+
+
+@pytest.mark.unit
+def test_a_tool_serves_the_run_instrument_whatever_the_model_passes():
+    args = _run(
+        tools.get_indicators, {"symbol": "RSI", "indicator": "rsi", "curr_date": TRADE_DATE}, tools
+    )
+    assert args[1] == "NVDA"
+
+
 class _State(MessagesState):
     trade_date: str
+    company_of_interest: str
 
 
 def _run(tool, args, module):
@@ -79,31 +120,34 @@ def _run(tool, args, module):
     graph.add_edge(START, "tools")
     graph.add_edge("tools", END)
     with mock.patch.object(module, "route_to_vendor", return_value="ok") as routed:
-        graph.compile().invoke({
-            "messages": [AIMessage("", tool_calls=[{"name": tool.name, "args": args, "id": "1"}])],
-            "trade_date": TRADE_DATE,
-        })
+        graph.compile().invoke(
+            {
+                "messages": [
+                    AIMessage("", tool_calls=[{"name": tool.name, "args": args, "id": "1"}])
+                ],
+                "trade_date": TRADE_DATE,
+                "company_of_interest": "NVDA",
+            }
+        )
     return routed.call_args.args
 
 
 @pytest.mark.unit
 def test_statement_tool_with_omitted_date_uses_the_run_date():
-    args = _run(tools.get_balance_sheet, {"ticker": "AAPL"}, tools)
+    args = _run(tools.get_balance_sheet, {}, tools)
     assert args[-1] == TRADE_DATE  # #1331: an omitted date no longer means unfiltered
 
 
 @pytest.mark.unit
 def test_future_curr_date_from_the_model_is_clamped():
-    args = _run(tools.get_fundamentals,
-                {"ticker": "AAPL", "curr_date": "2026-09-14"}, tools)
-    assert args == ("get_fundamentals", "AAPL", TRADE_DATE)
+    args = _run(tools.get_fundamentals, {"curr_date": "2026-09-14"}, tools)
+    assert args == ("get_fundamentals", "NVDA", TRADE_DATE)
 
 
 @pytest.mark.unit
 def test_future_window_from_the_model_is_clamped():
-    args = _run(tools.get_stock_data,
-                {"symbol": "AAPL", "start_date": "2026-08-01", "end_date": "2026-09-14"}, tools)
-    assert args == ("get_stock_data", "AAPL", "2026-08-01", TRADE_DATE, "1d")
+    args = _run(tools.get_stock_data, {"start_date": "2026-08-01", "end_date": "2026-09-14"}, tools)
+    assert args == ("get_stock_data", "NVDA", "2026-08-01", TRADE_DATE, "1d")
 
 
 @pytest.mark.unit
@@ -114,6 +158,7 @@ def test_direct_call_without_state_is_unchanged():
 
 
 # --- the run date itself (#1319) -------------------------------------------------
+
 
 @pytest.mark.unit
 @pytest.mark.parametrize("bad", ["2026-9-10", "2026-09-10 00:00", "Sept 10", None])
