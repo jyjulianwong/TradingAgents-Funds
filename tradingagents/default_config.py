@@ -242,65 +242,75 @@ def build_default_config() -> dict:
         # results from data vendors and social-media sources alike).
         "isin_ticker_map": {
             # Fidelity Index UK P Acc.
-            # FTSE All-Share. ISF.L tracks FTSE 100 (~85% of All-Share by cap), best liquid LSE proxy; no liquid FTSE All-Share ETF exists.
-            "GB00BJS8SF95": ["ISF.L"],
+            # FTSE All-Share. FTAL.L (SPDR FTSE UK All Share ETF) tracks the exact index; ISF.L (FTSE 100) kept as a liquid fallback.
+            "GB00BJS8SF95": ["FTAL.L", "ISF.L"],
             # Fidelity Index US P Acc.
             # S&P 500.
             "GB00BJS8SH10": ["SPY"],
             # FP WHEB Sustainability Impact C Acc.
-            # Verified top holdings. Autodesk, Xylem, Ecolab cover resource efficiency, water, environmental services themes; ADSK has larger weight than TE Connectivity.
-            "GB00B8HPRW47": ["ADSK", "XYL", "ECL"],
+            # 44-stock concentrated fund (top 10 ~37%). Top holdings at 31 Jul 2026: Keyence 4.2%, Thermo Fisher 4.0%, Agilent 3.9%,
+            # Ecolab 3.8%, Steris 3.7%, Xylem 3.6%, ..., Autodesk 3.3%. Health is the largest theme (~26%) and was missing; TMO/A added.
+            # Keyence (6861.T) is #1 but omitted for Tokyo-listing data-gap risk.
+            "GB00B8HPRW47": ["TMO", "A", "ECL", "XYL", "ADSK"],
             # HSBC American Index Acc C.
             # S&P 500.
             "GB00B80QG615": ["SPY"],
             # iShares Corporate Bond Index S Acc.
-            # iBoxx GBP Non-Gilts proxy.
+            # Benchmark is Markit iBoxx GBP Non-Gilts (corporates + supranationals/agencies). SLXX.L (iBoxx GBP Corporates) is the closest liquid ETF.
             "GB00BN08ZN29": ["SLXX.L"],
             # iShares Enviro & Low Carbon Tilt Real Estate S Acc.
-            # No liquid low-carbon REIT ETF exists; IWDP.L (FTSE EPRA Nareit Developed Div+) and REET (global REIT) are the best available proxies.
-            "GB00BN091933": ["IWDP.L", "REET"],
+            # FTSE EPRA Nareit Developed Green Low Carbon Target. Holdings (Welltower, Realty Income, Equinix, Prologis) track the parent
+            # FTSE EPRA Nareit Developed index closely, so HPRD.L (exact parent-index ETF) replaces IWDP.L (dividend-screened variant).
+            "GB00BN091933": ["HPRD.L", "REET"],
             # iShares Japan Equity Index S Acc.
-            # FTSE Japan.
+            # FTSE World Japan. EWJ (MSCI Japan) is a near-identical large/mid-cap proxy.
             "GB00BN08ZG51": ["EWJ"],
             # iShares Pacific ex Japan Equity Index S Acc.
-            "GB00BN08ZQ59": ["EPP"],
+            # FTSE World Asia-Pacific ex Japan INCLUDES Taiwan and South Korea. At Aug 2026: TSMC 19.6%, Samsung 10.5%, SK hynix 7.2%.
+            # EPP (MSCI Pacific ex Japan) covers only Australia/HK/Singapore/NZ and missed ~40%+ of the fund. EWT + EWY added.
+            "GB00BN08ZQ59": ["EWT", "EWY", "EPP"],
             # L&G European Index C Acc.
-            # FTSE World Europe ex UK. VGK (Vanguard FTSE Developed Europe ETF) is FTSE-family and highly liquid; replaces ROG.SW/NOVN.SW which are Swiss-listed with higher data-gap risk; ASML retained as the fund's largest holding.
-            "GB00BG0QP042": ["VGK", "ASML"],
+            # FTSE World Europe ex UK. VERX.L (Vanguard FTSE Developed Europe ex UK) replaces VGK, which holds ~20%+ UK stocks the fund excludes.
+            # ASML retained as the fund's largest holding.
+            "GB00BG0QP042": ["VERX.L", "ASML"],
             # L&G Future World ESG Tilted & Opt Emerging Markets C Acc.
-            # ESGE (iShares ESG Aware MSCI EM ETF) has correct ESG tilt; EEM had no ESG screens.
+            # ESGE (iShares ESG Aware MSCI EM ETF) has correct ESG tilt.
             "GB00BL6C2119": ["ESGE"],
             # L&G Future World ESG Tilted & Opt Developed C Acc.
+            # MSCI World proxy; ESG tilt is mild so headline developed-market beta dominates.
             "GB00BMFXWS95": ["IWDA.L"],
             # L&G Global Technology Index Trust C Acc.
-            # FTSE World Technology. IXN tracks S&P Global 1200 IT (genuinely global); VGT/QQQ are US-only or mixed-sector.
-            "GB00BJLP1W53": ["IXN"],
+            # FTSE World Technology uses ICB, which classes Alphabet (10.7% combined) and Meta (3.5%) as Technology.
+            # IXN (GICS IT) excludes both, so GOOGL and META are added to cover ~14% of the fund.
+            "GB00BJLP1W53": ["IXN", "GOOGL", "META"],
             # abrdn Global REIT Tracker N Acc.
-            # FTSE EPRA Nareit Developed.
-            "GB00BK5HLJ16": ["IWDP.L"],
+            # FTSE EPRA Nareit Developed. HPRD.L tracks the exact index; IWDP.L tracks the Dividend+ subset.
+            "GB00BK5HLJ16": ["HPRD.L"],
             # AXA Framlington Biotech Z Acc.
-            # IBB (iShares Nasdaq Biotech) top holdings (VRTX, AMGN, Gilead) match fund's actual holdings; reduces idiosyncratic single-stock noise vs 3 individual names.
+            # Large-cap tilted (VRTX, REGN, AMGN, GILD each ~6-7%); IBB is cap-weighted with the same leaders.
             "GB00B784NS11": ["IBB"],
             # AXA Framlington Health Z Acc.
-            # IXJ (iShares Global Healthcare) covers ~110 global healthcare leaders; XLV is US-only, unsuitable for a global-mandate fund.
+            # IXJ (iShares Global Healthcare) covers global mandate incl. AZN/Novo.
             "GB00B6WZJX05": ["IXJ"],
             # Barings Global Agriculture I Acc.
-            # MOO (VanEck Agribusiness ETF) covers full global agribusiness value chain (seeds, fertilisers, equipment, food processing); CTVA/NTR/MOS were too US-heavy and fertiliser-narrow.
+            # MOO (VanEck Agribusiness ETF) covers CTVA, NTR, DE, ADM, Kubota etc.
             "GB00B3B9VD63": ["MOO"],
             # BlackRock Natural Resources D Acc.
-            # GNR (SPDR S&P Global Natural Resources ETF) top holdings (Shell, BHP, Exxon, Glencore, FCX) closely mirror fund composition; WPM (precious-metals royalty streamer) was an outlier driving unrepresentative bear signals.
+            # ~35% energy / ~55% materials incl. ag inputs and gold. GNR mirrors this mix (XOM, SHEL, CVX, Glencore, Nutrien, Corteva).
             "GB00B6865B79": ["GNR"],
             # JPMorgan Natural Resources C Acc.
-            # GNR captures broad global natural resources; XOM adds energy weighting; NEM (gold miner) removed as it introduced gold-specific bias unrepresentative of the fund.
-            "GB00B88MP089": ["GNR", "XOM"],
+            # Gold/precious metals are now the largest theme: top 10 (Feb 2026) includes NEM 4.8%, AEM 4.3%, KGC 3.7%, WPM 3.0%,
+            # alongside XOM 4.7%, SHEL 4.0% and copper (Southern Copper, Grupo Mexico). GDX restores gold exposure; COPX adds copper.
+            "GB00B88MP089": ["GNR", "GDX", "XOM", "COPX"],
             # Ninety One Global Gold B Inc.
-            # GDX (VanEck Gold Miners ETF) added as primary sector ETF; NEM and GOLD are verified top-2 holdings of this ~25-stock concentrated fund.
-            "GB00BVLL5586": ["GDX", "NEM", "GOLD"],
+            # 34 holdings, top 10 ~56%. NEM 8.9%, Barrick 8.7%, AngloGold 7.0%, Gold Fields 6.6%.
+            # Barrick renamed Barrick Mining in May 2025 and its NYSE ticker changed from GOLD to B.
+            "GB00BVLL5586": ["GDX", "NEM", "B", "AU", "GFI"],
             # Schroder Global Healthcare Z Acc.
-            # IXJ (iShares Global Healthcare) provides global coverage; JNJ/LLY/UNH were US-biased, missing European pharma exposure.
+            # IXJ (iShares Global Healthcare) provides global coverage.
             "GB00B76V7Q08": ["IXJ"],
             # WS Guinness Global Energy I Acc.
-            # IXC (iShares Global Energy ETF) added as primary global-energy proxy; XOM and SHEL are confirmed top holdings of this 30-position equal-weight global energy fund.
+            # IXC (iShares Global Energy ETF) as primary proxy; XOM and SHEL are top holdings of this ~30-stock equal-weight fund.
             "GB00B56FW078": ["IXC", "XOM", "SHEL"]
         },
         # CLI-only settings — consumed by cli/selections.py and cli/run.py; ignored
