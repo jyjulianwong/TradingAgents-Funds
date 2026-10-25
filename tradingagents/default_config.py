@@ -8,20 +8,24 @@ _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 # of the existing default, so users can keep writing plain strings in
 # their .env file.
 _ENV_OVERRIDES = {
-    "TRADINGAGENTS_LLM_PROVIDER":               "llm_provider",
-    "TRADINGAGENTS_DEEP_THINK_LLM":             "deep_think_llm",
-    "TRADINGAGENTS_QUICK_THINK_LLM":            "quick_think_llm",
-    "TRADINGAGENTS_LLM_BACKEND_URL":            "backend_url",
-    "TRADINGAGENTS_OUTPUT_LANGUAGE":            "output_language",
-    "TRADINGAGENTS_MAX_DEBATE_ROUNDS":          "max_debate_rounds",
-    "TRADINGAGENTS_MAX_RISK_ROUNDS":            "max_risk_discuss_rounds",
-    "TRADINGAGENTS_MAX_TOOL_ROUNDS":            "max_tool_rounds",
-    "TRADINGAGENTS_CHECKPOINT_ENABLED":         "checkpoint_enabled",
-    "TRADINGAGENTS_BENCHMARK_TICKER":           "benchmark_ticker",
-    "TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE":   "isin_ticker_map_override",
-    "TRADINGAGENTS_TEMPERATURE":                "temperature",
-    "TRADINGAGENTS_LLM_MAX_RETRIES":            "llm_max_retries",
-    "TRADINGAGENTS_MAX_TOKENS":                 "max_tokens",
+    "TRADINGAGENTS_LLM_PROVIDER":         "llm_provider",
+    "TRADINGAGENTS_DEEP_THINK_LLM":       "deep_think_llm",
+    "TRADINGAGENTS_QUICK_THINK_LLM":      "quick_think_llm",
+    "TRADINGAGENTS_DEEP_THINK_PROVIDER":       "deep_think_provider",
+    "TRADINGAGENTS_QUICK_THINK_PROVIDER":      "quick_think_provider",
+    "TRADINGAGENTS_DEEP_THINK_BACKEND_URL":    "deep_think_backend_url",
+    "TRADINGAGENTS_QUICK_THINK_BACKEND_URL":   "quick_think_backend_url",
+    "TRADINGAGENTS_LLM_BACKEND_URL":      "backend_url",
+    "TRADINGAGENTS_OUTPUT_LANGUAGE":      "output_language",
+    "TRADINGAGENTS_MAX_DEBATE_ROUNDS":    "max_debate_rounds",
+    "TRADINGAGENTS_MAX_RISK_ROUNDS":      "max_risk_discuss_rounds",
+    "TRADINGAGENTS_MAX_TOOL_ROUNDS":      "max_tool_rounds",
+    "TRADINGAGENTS_CHECKPOINT_ENABLED":   "checkpoint_enabled",
+    "TRADINGAGENTS_BENCHMARK_TICKER":     "benchmark_ticker",
+    "TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE": "isin_ticker_map_override",
+    "TRADINGAGENTS_TEMPERATURE":          "temperature",
+    "TRADINGAGENTS_LLM_MAX_RETRIES":      "llm_max_retries",
+    "TRADINGAGENTS_MAX_TOKENS":           "max_tokens",
     # Provider-specific reasoning/thinking knobs (None = each provider's own
     # default). Settable here for non-interactive runs; the CLI also offers an
     # interactive choice, which is skipped when the matching var is set.
@@ -99,6 +103,13 @@ def build_default_config() -> dict:
         # provider-specific URL here would leak (e.g. OpenAI's /v1 was previously
         # being forwarded to Gemini, producing malformed request URLs).
         "backend_url": None,
+        # A tier may name its own provider and endpoint (#1440): the quick tier serves
+        # the analysts, researchers, debaters and trader, the deep tier the managers.
+        # None means the tier uses llm_provider and backend_url.
+        "quick_think_provider": None,
+        "deep_think_provider": None,
+        "quick_think_backend_url": None,
+        "deep_think_backend_url": None,
         # Provider-specific thinking configuration
         "google_thinking_level": None,      # "high", "minimal", etc.
         "openai_reasoning_effort": None,    # "medium", "high", "low"
@@ -182,8 +193,8 @@ def build_default_config() -> dict:
         # based on the ticker's exchange suffix. SPY remains the US default
         # so the reflection label keeps reading "Alpha vs SPY" for US tickers
         # while non-US tickers get their regional index automatically.
-        # Trading days after the analysis date over which a decision's outcome is
-        # measured, for reflection and for the backtest figures.
+        # Trading days from the first close after the analysis date over which a
+        # decision's outcome is measured, for reflection and for the backtest figures.
         "holding_period_days": 5,
         "benchmark_ticker": None,
         "benchmark_map": {
