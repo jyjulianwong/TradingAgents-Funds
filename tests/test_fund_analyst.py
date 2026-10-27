@@ -15,7 +15,7 @@ import tradingagents.dataflows.config as config_module
 import tradingagents.default_config as default_config
 from tradingagents.agents.analysts.fund_analyst import create_fund_analyst
 from tradingagents.agents.context import is_isin, resolve_isin_ticker_list
-from tradingagents.agents.schemas import FundHoldingsAnalysis
+from tradingagents.agents.fund_schemas import FundHoldingsAnalysis
 from tradingagents.dataflows import router
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.errors import NoMarketDataError

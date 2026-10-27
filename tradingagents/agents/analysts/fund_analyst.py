@@ -47,8 +47,8 @@ from tradingagents.agents.context import (
     resolve_isin_ticker_list,
 )
 from tradingagents.agents.fund_data_tools import get_fund_fact_sheet
+from tradingagents.agents.fund_schemas import FundHoldingsAnalysis
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
-from tradingagents.agents.schemas import FundHoldingsAnalysis
 from tradingagents.agents.structured import NO_EXTERNAL_TOOLS, bind_structured
 from tradingagents.agents.symbol_search_tools import search_ticker_symbol
 from tradingagents.dataflows.config import get_config

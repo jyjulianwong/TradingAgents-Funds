@@ -24,3 +24,14 @@ merge it with `git fetch TradingAgents main && git merge TradingAgents/main`.
 
 - Do not run a formatter over upstream-owned files; keep their layout so upstream merges stay small.
 - Prefer new fork-only modules plus a one-line hook in the upstream file, tagged `# FORK(funds): <topic>`.
+
+## Where the fork's logic lives
+
+Fork behaviour is kept in fork-only modules; the upstream files carry only tagged hooks.
+
+| Upstream file | Fork module | Hook in the upstream file |
+| --- | --- | --- |
+| `agents/context.py` | `agents/fund_context.py` (ISIN detection, proxy-ticker resolution, fund and autonomous-agent prompt notes) | re-export import, `mapped_tickers` parameter, one `fund_instrument_note` call |
+| `agents/schemas.py` | `agents/fund_schemas.py` (`FundHoldingsAnalysis`) | none (untouched) |
+| `default_config.py` | `fund_config.py` (env overrides, fund vendors, `isin_ticker_map`, CLI presets, OHLCV interval) | four `**FUND_*` merges |
+| `dataflows/router.py` | `dataflows/fund_vendors.py` (fund fact-sheet and symbol-search routing) | three table merges |
