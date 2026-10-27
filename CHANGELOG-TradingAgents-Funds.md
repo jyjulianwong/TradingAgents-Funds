@@ -3,7 +3,11 @@
 Changes specific to this fork of [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents).
 See `FORK.md` for how to find fork edits (`grep -rn "FORK(funds)"`).
 
-## Unreleased: merge of upstream v0.7.0
+## Unreleased: merge of upstream v0.7.1
+
+- Merged upstream v0.7.1. Upstream fixed the Windows/macOS lock-error handling itself, so the fork's `windows-lock-fix` edit was dropped. Moved the proxy-instruments report banner into `fund_report.py`.
+
+## Merge of upstream v0.7.0
 
 ### Still tangled with upstream (needs looking into)
 
@@ -18,7 +22,7 @@ Largest remaining edits (lines added/removed against upstream v0.7.0):
 - `tradingagents/dataflows/vendors/yahoo/ohlcv.py` (+56/-15) and `vendors/alpha_vantage/stock.py` (+37/-20): configurable candle interval (`ohlcv_interval`), unrelated to funds.
 - `tradingagents/agents/analysts/market_analyst.py` (+50) and `fundamentals_analyst.py` (+40): per-proxy-ticker loops and fund notes inside the analyst functions.
 - `cli/selections.py` (+39/-7): environment-driven skips for the analysis date and analysts prompts.
-- `tradingagents/reporting.py` (+36), `graph/setup.py` (+21/-6), `graph/trading_graph.py` (+17/-2), `agents/state.py` (+14), `agents/tools.py` (+20): Fund Analyst section and banner, graph wiring, state fields, tool changes.
+- `tradingagents/reporting.py`, `graph/setup.py` (+21/-6), `graph/trading_graph.py` (+17/-2), `agents/state.py` (+14), `agents/tools.py` (+20): Fund Analyst section and banner, graph wiring, state fields, tool changes.
 - Bull/bear researchers, risk debaters, research manager, portfolio manager and trader: a fund-instruction hook, a markdown-table fix and an autonomous-agent hotfix in each prompt (about 14 lines per file).
 
 Edits that are not fund features and could be split out or proposed upstream:
@@ -27,7 +31,6 @@ Edits that are not fund features and could be split out or proposed upstream:
 - Markdown blank-line-before-table fix applied to every agent output (`agents/markdown.py` plus hooks).
 - `get_autonomous_agent_instruction` prompt hotfixes (`FORK(funds): hotfix #0001` and `#0002`).
 - Reddit RSS feed-token support (`dataflows/vendors/reddit.py`).
-- Windows/macOS lock-error fix (`dataflows/files.py`, tagged `windows-lock-fix`).
 - Prompt wording changes (for example news "past week" became "past month").
 
 Other loose ends:

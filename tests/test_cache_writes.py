@@ -107,9 +107,7 @@ def test_on_windows_the_lock_is_waited_for_while_another_writer_holds_it(tmp_pat
     import errno
     import sys
 
-    # FORK(funds): windows-lock-fix
-    deadlock_errno = getattr(errno, "EDEADLOCK", errno.EDEADLK)
-    fake, calls = _fake_msvcrt([OSError(deadlock_errno, "held"), None])
+    fake, calls = _fake_msvcrt([OSError(errno.EDEADLK, "held"), None])
     monkeypatch.setitem(sys.modules, "msvcrt", fake)
 
     with open(tmp_path / "log.md.lock", "a+b") as handle, files._hold_windows(handle):

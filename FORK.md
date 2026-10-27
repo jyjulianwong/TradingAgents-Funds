@@ -16,7 +16,7 @@ merge it with `git fetch TradingAgents main && git merge TradingAgents/main`.
   The text after the colon names the topic: `fund` (Fund Analyst / ISIN proxy support),
   `ohlcv-interval` (configurable candle interval), `markdown-tables` (blank line before tables),
   `autonomous-agent` / `hotfix #000N` (prompt hotfixes), `cli-presets` (env-driven CLI skips),
-  `visualizer`, `reddit-feed-token`, `sentiment-window`, `windows-lock-fix`.
+  `visualizer`, `reddit-feed-token`, `sentiment-window`.
   Import lines are left unmarked (a comment there makes isort reflow them); the code that
   uses the import is marked.
 
@@ -35,3 +35,4 @@ Fork behaviour is kept in fork-only modules; the upstream files carry only tagge
 | `agents/schemas.py` | `agents/fund_schemas.py` (`FundHoldingsAnalysis`) | none (untouched) |
 | `default_config.py` | `fund_config.py` (env overrides, fund vendors, `isin_ticker_map`, CLI presets, OHLCV interval) | four `**FUND_*` merges |
 | `dataflows/router.py` | `dataflows/fund_vendors.py` (fund fact-sheet and symbol-search routing) | three table merges |
+| `reporting.py` | `fund_report.py` (`proxy_banner`) | one import, the Fund Analyst section row, one call |
