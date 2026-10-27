@@ -41,22 +41,10 @@ def test_sec_edgar_writers_never_share_a_temp_file(monkeypatch, tmp_path):
 
 @pytest.mark.unit
 def test_the_price_cache_is_replaced_whole(monkeypatch, tmp_path):
-    frame = pd.DataFrame(
-        {
-            "Date": pd.bdate_range("2026-01-02", periods=3),
-            "Open": 1.0,
-            "High": 1.0,
-            "Low": 1.0,
-            "Close": 1.0,
-            "Volume": 1,
-        }
-    )
+    frame = pd.DataFrame({"Date": pd.bdate_range("2026-01-02", periods=3), "Open": 1.0, "High": 1.0,
+                          "Low": 1.0, "Close": 1.0, "Volume": 1})
     monkeypatch.setattr(ohlcv, "get_config", lambda: {"data_cache_dir": str(tmp_path)})
-    monkeypatch.setattr(
-        ohlcv.yf,
-        "Ticker",
-        lambda s: type("T", (), {"history": lambda self, **k: frame.set_index("Date")})(),
-    )
+    monkeypatch.setattr(ohlcv.yf, "Ticker", lambda s: type("T", (), {"history": lambda self, **k: frame.set_index("Date")})())
     moves = _recording_replace(monkeypatch)
 
     ohlcv.load_ohlcv("AAPL", "2026-01-06")
@@ -129,20 +117,15 @@ def test_on_windows_the_lock_is_waited_for_while_another_writer_holds_it(tmp_pat
 
 
 @pytest.mark.unit
-def test_on_windows_a_lock_that_cannot_be_taken_is_reported_not_retried_forever(
-    tmp_path, monkeypatch
-):
+def test_on_windows_a_lock_that_cannot_be_taken_is_reported_not_retried_forever(tmp_path, monkeypatch):
     import errno
     import sys
 
     fake, _ = _fake_msvcrt([OSError(errno.EINVAL, "bad handle")] * 3)
     monkeypatch.setitem(sys.modules, "msvcrt", fake)
 
-    with (
-        pytest.raises(OSError, match="bad handle"),
-        open(tmp_path / "log.md.lock", "a+b") as handle,
-        files._hold_windows(handle),
-    ):
+    with pytest.raises(OSError, match="bad handle"), open(tmp_path / "log.md.lock", "a+b") as handle, \
+            files._hold_windows(handle):
         pass
 
 

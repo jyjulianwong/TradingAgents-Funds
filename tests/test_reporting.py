@@ -22,16 +22,9 @@ def _state():
     }
 
 
-SETTINGS = {
-    "version": "0.5.2",
-    "llm_provider": "openai",
-    "deep_think_llm": "gpt-6-sol",
-    "quick_think_llm": "gpt-6-luna",
-    "analysts": ["market", "news"],
-    "max_debate_rounds": 1,
-    "max_risk_discuss_rounds": 2,
-    "data_vendors": {"core_stock_apis": "yfinance"},
-}
+SETTINGS = {"version": "0.5.2", "llm_provider": "openai", "deep_think_llm": "gpt-6-sol",
+            "quick_think_llm": "gpt-6-luna", "analysts": ["market", "news"], "max_debate_rounds": 1,
+            "max_risk_discuss_rounds": 2, "data_vendors": {"core_stock_apis": "yfinance"}}
 
 
 @pytest.mark.unit
@@ -65,6 +58,7 @@ def test_save_reports_defaults_under_results_dir(tmp_path):
     assert out.exists()
     assert out.parent.parent.name == "reports"  # results_dir/reports/AAPL_<stamp>/...
     assert out.parent.name.startswith("AAPL_")
+
 
 
 @pytest.mark.unit
@@ -109,9 +103,7 @@ def test_non_fund_report_has_no_proxy_banner(tmp_path):
 def test_the_report_names_the_analysis_date_and_what_produced_it(tmp_path):
     state = dict(_state(), trade_date="2026-09-23")
 
-    header = (
-        write_report_tree(state, "NVDA", tmp_path, settings=SETTINGS).read_text().split("## ")[0]
-    )
+    header = write_report_tree(state, "NVDA", tmp_path, settings=SETTINGS).read_text().split("## ")[0]
 
     assert "Analysis date: 2026-09-23" in header
     assert "TradingAgents 0.5.2" in header
@@ -127,18 +119,10 @@ def test_run_settings_record_the_run_without_endpoints_or_paths():
 
     graph = object.__new__(TradingAgentsGraph)
     graph.selected_analysts = ("market", "news")
-    graph.config = {
-        "llm_provider": "openai",
-        "deep_think_llm": "gpt-6-sol",
-        "quick_think_llm": "gpt-6-luna",
-        "max_debate_rounds": 1,
-        "max_risk_discuss_rounds": 1,
-        "output_language": "English",
-        "data_vendors": {"core_stock_apis": "yfinance"},
-        "tool_vendors": {},
-        "backend_url": "https://user:secret@relay.example/v1",
-        "results_dir": "/home/me/results",
-    }
+    graph.config = {"llm_provider": "openai", "deep_think_llm": "gpt-6-sol", "quick_think_llm": "gpt-6-luna",
+                    "max_debate_rounds": 1, "max_risk_discuss_rounds": 1, "output_language": "English",
+                    "data_vendors": {"core_stock_apis": "yfinance"}, "tool_vendors": {},
+                    "backend_url": "https://user:secret@relay.example/v1", "results_dir": "/home/me/results"}
 
     settings = graph.run_settings()
 

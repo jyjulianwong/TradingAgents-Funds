@@ -78,9 +78,7 @@ def get_indicators(
             results.append(f"ATR not applicable — OEIC O/H/L data is not published for {symbol}.")
             continue
         try:
-            results.append(
-                route_to_vendor("get_indicators", symbol, ind, curr_date, look_back_days)
-            )
+            results.append(route_to_vendor("get_indicators", symbol, ind, curr_date, look_back_days))
         except ValueError as e:
             results.append(str(e))
     return "\n\n".join(results)
@@ -211,12 +209,8 @@ def get_news(
 @tool
 def get_global_news(
     curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
-    look_back_days: Annotated[
-        int | None, "Days to look back; omit to use the configured default"
-    ] = None,
-    limit: Annotated[
-        int | None, "Max articles to return; omit to use the configured default"
-    ] = None,
+    look_back_days: Annotated[int | None, "Days to look back; omit to use the configured default"] = None,
+    limit: Annotated[int | None, "Max articles to return; omit to use the configured default"] = None,
     trade_date: Annotated[str, InjectedState("trade_date")] = "",
 ) -> str:
     """
@@ -282,9 +276,7 @@ def get_macro_indicators(
     Returns:
         str: A formatted markdown report of the macro series
     """
-    return route_to_vendor(
-        "get_macro_indicators", indicator, as_of(curr_date, trade_date), look_back_days
-    )
+    return route_to_vendor("get_macro_indicators", indicator, as_of(curr_date, trade_date), look_back_days)
 
 
 @tool

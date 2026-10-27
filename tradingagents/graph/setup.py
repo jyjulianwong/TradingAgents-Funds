@@ -78,15 +78,9 @@ def _analyst_graph(spec, agent, max_tool_rounds: int):
         return "wrap_up" if rounds(state["messages"]) >= max_tool_rounds else "agent"
 
     def wrap_up(state):
-        repeated = ", ".join(
-            f"{name} x{n}" for name, n in Counter(calls(state["messages"])).most_common()
-        )
-        logger.warning(
-            "%s used its %d tool rounds (%s); asking for its report",
-            spec.agent_node,
-            max_tool_rounds,
-            repeated,
-        )
+        repeated = ", ".join(f"{name} x{n}" for name, n in Counter(calls(state["messages"])).most_common())
+        logger.warning("%s used its %d tool rounds (%s); asking for its report",
+                       spec.agent_node, max_tool_rounds, repeated)
         return agent({**state, "messages": [*state["messages"], HumanMessage(WRAP_UP)]})
 
     graph.add_node("tools", ToolNode(list(spec.tools)))
@@ -153,10 +147,8 @@ class GraphSetup:
         workflow = StateGraph(AgentState)
 
         for spec in plan.specs:
-            workflow.add_node(
-                spec.agent_node,
-                _analyst_graph(spec, analyst_factories[spec.key](), self.max_tool_rounds),
-            )
+            workflow.add_node(spec.agent_node,
+                              _analyst_graph(spec, analyst_factories[spec.key](), self.max_tool_rounds))
 
         # Add other nodes
         workflow.add_node("Fund Analyst", fund_analyst_node)

@@ -26,17 +26,9 @@ _ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
 # A fixed, common indicator set so the snapshot is the same shape every run.
 DEFAULT_SNAPSHOT_INDICATORS: tuple[str, ...] = (
-    "close_10_ema",
-    "close_50_sma",
-    "close_200_sma",
-    "rsi",
-    "boll",
-    "boll_ub",
-    "boll_lb",
-    "macd",
-    "macds",
-    "macdh",
-    "atr",
+    "close_10_ema", "close_50_sma", "close_200_sma",
+    "rsi", "boll", "boll_ub", "boll_lb",
+    "macd", "macds", "macdh", "atr",
 )
 
 
@@ -58,9 +50,7 @@ def _verified_rows(symbol: str, as_of_date: str) -> pd.DataFrame:
     df = df.dropna(subset=["Date"])
     df = df[df["Date"] <= pd.to_datetime(as_of_date)].sort_values("Date")
     if df.empty:
-        raise NoMarketDataError(
-            symbol, normalize_symbol(symbol), f"no price rows on or before {as_of_date}"
-        )
+        raise NoMarketDataError(symbol, normalize_symbol(symbol), f"no price rows on or before {as_of_date}")
     return df
 
 
@@ -71,7 +61,7 @@ def _fmt(value) -> str:
         return value.strftime("%Y-%m-%d")
     if isinstance(value, bool):
         return str(value)
-    if isinstance(value, int):
+    if isinstance(value, (int,)):
         return str(value)
     if isinstance(value, float):
         return f"{value:.2f}"
@@ -126,23 +116,13 @@ def build_verified_market_snapshot(
     for field in ("Open", "High", "Low", "Close", "Volume"):
         lines.append(f"| {field} | {_fmt(latest.get(field))} |")
 
-    lines += [
-        "",
-        "### Verified technical indicators (latest row)",
-        "",
-        "| Indicator | Value |",
-        "|---|---:|",
-    ]
+    lines += ["", "### Verified technical indicators (latest row)", "",
+              "| Indicator | Value |", "|---|---:|"]
     for name, value in indicator_values.items():
         lines.append(f"| {name} | {value} |")
 
-    lines += [
-        "",
-        f"### Recent verified closes (last {len(recent)} rows)",
-        "",
-        "| Date | Close |",
-        "|---|---:|",
-    ]
+    lines += ["", f"### Recent verified closes (last {len(recent)} rows)", "",
+              "| Date | Close |", "|---|---:|"]
     for _, row in recent.iterrows():
         lines.append(f"| {_fmt(row['Date'])} | {_fmt(row.get('Close'))} |")
 

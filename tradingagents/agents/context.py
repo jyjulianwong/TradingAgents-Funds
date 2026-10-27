@@ -154,7 +154,6 @@ def get_language_instruction() -> str:
     report rather than a mix of languages.
     """
     from tradingagents.dataflows.config import get_config
-
     lang = get_config().get("output_language", "English")
     if lang.strip().lower() == "english":
         return ""
@@ -163,7 +162,7 @@ def get_language_instruction() -> str:
     # search, where a negated rating ("not a Sell") reads as the call (#1435).
     return (
         f" Write your entire response in {lang}, except the labelled lines the format"
-        f' asks for (the "**Rating**:" line, "FINAL TRANSACTION PROPOSAL:"):'
+        f" asks for (the \"**Rating**:\" line, \"FINAL TRANSACTION PROPOSAL:\"):"
         f" keep their label and value in English, exactly as specified."
     )
 
