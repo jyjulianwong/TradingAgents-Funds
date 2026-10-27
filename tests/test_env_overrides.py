@@ -59,16 +59,8 @@ def test_int_coercion(monkeypatch):
 @pytest.mark.parametrize(
     "raw,expected",
     [
-        ("true", True),
-        ("True", True),
-        ("1", True),
-        ("yes", True),
-        ("on", True),
-        ("false", False),
-        ("False", False),
-        ("0", False),
-        ("no", False),
-        ("off", False),
+        ("true", True), ("True", True), ("1", True), ("yes", True), ("on", True),
+        ("false", False), ("False", False), ("0", False), ("no", False), ("off", False),
     ],
 )
 def test_bool_coercion(monkeypatch, raw, expected):
@@ -97,6 +89,7 @@ def test_reasoning_effort_defaults_to_none(monkeypatch):
     assert config["anthropic_effort"] is None
 
 
+# FORK(funds): fund
 def test_isin_ticker_map_override_defaults_to_false(monkeypatch):
     config = _config_with_env(monkeypatch)
     assert config["isin_ticker_map_override"] is False

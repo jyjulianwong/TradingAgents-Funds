@@ -9,12 +9,13 @@ from stockstats import wrap
 
 from tradingagents.dataflows.errors import NoMarketDataError, VendorError
 from tradingagents.dataflows.symbols import normalize_symbol
-from tradingagents.dataflows.vendors.yahoo.common import raise_for_empty, yf_retry
+from tradingagents.dataflows.vendors.yahoo.common import price_text, raise_for_empty, yf_retry
 from tradingagents.dataflows.vendors.yahoo.ohlcv import _assert_ohlcv_not_stale, load_ohlcv
 
 logger = logging.getLogger(__name__)
 
 
+# FORK(funds): ohlcv-interval
 def get_YFin_data_online(
     symbol: Annotated[str, "ticker symbol of the company"],
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
@@ -26,12 +27,14 @@ def get_YFin_data_online(
 
     # Resolve broker/forex symbols to Yahoo's convention (XAUUSD+ -> GC=F).
     canonical = normalize_symbol(symbol)
+    # FORK(funds): fund
     ticker = yf.Ticker(canonical)
 
     # yfinance treats ``end`` as EXCLUSIVE, so it would drop the requested
     # end_date row (and the current day when end_date is today). Request one day
     # past end_date so the requested range is actually inclusive (#986/#987).
     end_inclusive = (end_dt + relativedelta(days=1)).strftime("%Y-%m-%d")
+    # FORK(funds): ohlcv-interval
     data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive, interval=interval))
 
     # Empty result means the symbol is unknown/delisted. Raise a typed error
@@ -49,11 +52,9 @@ def get_YFin_data_online(
     # turns into one clear unavailable signal (#1021).
     _assert_ohlcv_not_stale(data, end_date, symbol, canonical)
 
-    # Round numerical values to 2 decimal places for cleaner display
-    numeric_columns = ["Open", "High", "Low", "Close", "Adj Close"]
-    for col in numeric_columns:
+    for col in ("Open", "High", "Low", "Close", "Adj Close"):
         if col in data.columns:
-            data[col] = data[col].round(2)
+            data[col] = data[col].map(price_text, na_action="ignore")
 
     csv_string = data.to_csv()
 
@@ -69,7 +70,9 @@ def get_YFin_data_online(
 def get_stock_stats_indicators_window(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to get the analysis and report of"],
-    as_of_date: Annotated[str, "The current trading date you are trading on, YYYY-mm-dd"],
+    as_of_date: Annotated[
+        str, "The current trading date you are trading on, YYYY-mm-dd"
+    ],
     look_back_days: Annotated[int, "how many days to look back"],
 ) -> str:
     best_ind_params = {
@@ -163,7 +166,7 @@ def get_stock_stats_indicators_window(
         date_values = []
 
         while current_dt >= before:
-            date_str = current_dt.strftime("%Y-%m-%d")
+            date_str = current_dt.strftime('%Y-%m-%d')
 
             # Look up the indicator value for this date
             if date_str in indicator_data:
@@ -205,7 +208,7 @@ def get_stock_stats_indicators_window(
 def _get_stock_stats_bulk(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to calculate"],
-    as_of_date: Annotated[str, "current date for reference"],
+    as_of_date: Annotated[str, "current date for reference"]
 ) -> dict:
     """
     Optimized bulk calculation of stock stats indicators.
@@ -236,7 +239,9 @@ def _get_stock_stats_bulk(
 def get_stockstats_indicator(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to get the analysis and report of"],
-    as_of_date: Annotated[str, "The current trading date you are trading on, YYYY-mm-dd"],
+    as_of_date: Annotated[
+        str, "The current trading date you are trading on, YYYY-mm-dd"
+    ],
 ) -> str:
     as_of_dt = datetime.strptime(as_of_date, "%Y-%m-%d")
     as_of_date = as_of_dt.strftime("%Y-%m-%d")
@@ -264,9 +269,7 @@ def get_closes(symbol: str, start_date: str, end_date: str) -> pd.Series:
     """Daily closes from ``start_date`` up to, not including, ``end_date``."""
     canonical = normalize_symbol(symbol)
     history = yf_retry(lambda: yf.Ticker(canonical).history(start=start_date, end=end_date))
-    return (
-        history["Close"] if history is not None and "Close" in history else pd.Series(dtype=float)
-    )
+    return history["Close"] if history is not None and "Close" in history else pd.Series(dtype=float)
 
 
 def get_stock_stats(
@@ -274,7 +277,9 @@ def get_stock_stats(
     indicator: Annotated[
         str, "quantitative indicators based off of the stock data for the company"
     ],
-    as_of_date: Annotated[str, "curr date for retrieving stock price data, YYYY-mm-dd"],
+    as_of_date: Annotated[
+        str, "curr date for retrieving stock price data, YYYY-mm-dd"
+    ],
 ):
     data = load_ohlcv(symbol, as_of_date)
     df = wrap(data)

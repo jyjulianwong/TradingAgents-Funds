@@ -5,7 +5,6 @@ day's bar was final is not served that snapshot all day (#1150). Keying the file
 by symbol rather than by day keeps the cache from growing a file per symbol per
 day (#1330).
 """
-
 from __future__ import annotations
 
 import os
@@ -71,6 +70,7 @@ def test_a_download_from_an_earlier_day_is_not_fresh(tmp_path):
     assert ohlcv._cache_is_fresh(f, pd.Timestamp("2026-05-01"), NOW) is False
 
 
+# FORK(funds): ohlcv-interval
 @pytest.mark.unit
 def test_load_ohlcv_refetches_stale_same_day_cache(tmp_path, monkeypatch):
     """End-to-end: the freshness check is wired into load_ohlcv's cache branch.
@@ -96,6 +96,7 @@ def test_load_ohlcv_refetches_stale_same_day_cache(tmp_path, monkeypatch):
 
 @pytest.mark.unit
 def test_load_ohlcv_reuses_fresh_same_day_cache(tmp_path, monkeypatch):
+    # FORK(funds): ohlcv-interval
     _write(tmp_path, name="AAPL-YFin-data-1d.csv", last_date="2026-07-18")
     _load(tmp_path, monkeypatch, "2026-07-18", _fail_download)
 
@@ -104,17 +105,10 @@ def test_load_ohlcv_reuses_fresh_same_day_cache(tmp_path, monkeypatch):
 def test_one_cache_file_per_symbol_across_days(tmp_path, monkeypatch):
     """A later day's download replaces the symbol's file instead of adding one (#1330)."""
     monkeypatch.setattr(ohlcv, "get_config", lambda: {"data_cache_dir": str(tmp_path)})
-    frame = pd.DataFrame(
-        {"Date": pd.to_datetime(["2026-07-16", "2026-07-17"]), "Close": [1.0, 2.0]}
-    )
+    frame = pd.DataFrame({"Date": pd.to_datetime(["2026-07-16", "2026-07-17"]), "Close": [1.0, 2.0]})
     downloads = []
-    monkeypatch.setattr(
-        ohlcv.yf,
-        "Ticker",
-        lambda symbol: SimpleNamespace(
-            history=lambda *a, **k: downloads.append(1) or frame.set_index("Date")
-        ),
-    )
+    monkeypatch.setattr(ohlcv.yf, "Ticker", lambda symbol: SimpleNamespace(
+        history=lambda *a, **k: downloads.append(1) or frame.set_index("Date")))
 
     for day in ("2026-07-18 10:00", "2026-07-19 10:00", "2026-07-20 10:00"):
         now = pd.Timestamp(day)
@@ -124,4 +118,5 @@ def test_one_cache_file_per_symbol_across_days(tmp_path, monkeypatch):
         _stamp(written[0], now)
 
     assert len(downloads) == 3, "each new day refetches"
+    # FORK(funds): ohlcv-interval
     assert [p.name for p in tmp_path.iterdir()] == ["AAPL-YFin-data-1d.csv"]

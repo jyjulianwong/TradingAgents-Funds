@@ -25,6 +25,7 @@ def create_portfolio_manager(llm):
     structured_llm = bind_structured(llm, PortfolioDecision, "Portfolio Manager")
 
     def portfolio_manager_node(state) -> dict:
+        # FORK(funds): fund
         ticker = state["company_of_interest"]
         instrument_context = get_instrument_context_from_state(state)
         portfolio_context = get_portfolio_context_from_state(state)
@@ -41,6 +42,7 @@ def create_portfolio_manager(llm):
             else ""
         )
 
+        # FORK(funds): fund
         prompt = f"""As the Portfolio Manager, synthesize the risk analysts' debate and deliver the final trading decision.
 
 {instrument_context}

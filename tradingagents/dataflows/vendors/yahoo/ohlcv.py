@@ -26,6 +26,7 @@ OHLCV_CACHE_TTL_SECONDS = 900
 # yfinance enforces hard history limits for intraday intervals. Keys are the
 # yfinance interval strings; values are the safe lookback in calendar days.
 # Intervals absent from this map (daily, weekly, monthly) use a 5-year window.
+# FORK(funds): ohlcv-interval
 _INTERVAL_LOOKBACK_DAYS: dict[str, int] = {
     "1m": 6,
     "2m": 59,
@@ -169,11 +170,10 @@ def _cache_is_fresh(data_file, as_of_dt, now) -> bool:
     written = pd.Timestamp.fromtimestamp(os.path.getmtime(data_file))
     if written.date() != now.date():
         return False
-    return (
-        as_of_dt.date() < now.date() or (now - written).total_seconds() <= OHLCV_CACHE_TTL_SECONDS
-    )
+    return as_of_dt.date() < now.date() or (now - written).total_seconds() <= OHLCV_CACHE_TTL_SECONDS
 
 
+# FORK(funds): ohlcv-interval
 def load_ohlcv(
     symbol: str,
     as_of_date: str,
@@ -193,6 +193,7 @@ def load_ohlcv(
     continuous series. Pass ``False`` to read the values as the vendor reported
     them, leaving a cell that was never reported empty.
     """
+    # FORK(funds): ohlcv-interval
     if interval is None:
         interval = get_config().get("tool_vendors", {}).get("ohlcv_interval", "1d")
 
@@ -205,8 +206,9 @@ def load_ohlcv(
     config = get_config()
     as_of_dt = pd.to_datetime(as_of_date).normalize()
 
-    # One cache file per symbol+interval, holding the latest download up to today.
+    # One cache file per symbol, holding the latest 5y-to-today download.
     now = pd.Timestamp.today()
+    # FORK(funds): ohlcv-interval
     lookback_days = _INTERVAL_LOOKBACK_DAYS.get(interval)
     if lookback_days is not None:
         start_date = now - pd.Timedelta(days=lookback_days)
@@ -222,6 +224,7 @@ def load_ohlcv(
     # One cache file per symbol+interval (not per date range, #1330) so a later
     # day's download replaces it instead of accumulating a file per day.
     # Include interval in the filename so different intervals don't share a cache.
+    # FORK(funds): ohlcv-interval
     data_file = os.path.join(
         config["data_cache_dir"],
         f"{safe_symbol}-YFin-data-{interval}.csv",
@@ -243,6 +246,7 @@ def load_ohlcv(
     if data is None:
         # yf.download catches every error, a rate limit included, and returns
         # an empty frame. Ticker.history raises the rate limit, so it is retried.
+        # FORK(funds): ohlcv-interval
         downloaded = yf_retry(
             lambda: yf.Ticker(canonical).history(
                 start=start_str,
@@ -275,14 +279,13 @@ def load_ohlcv(
     if not data.empty and pd.isna(data["Close"].iloc[-1]):
         settled = data["Close"].notna().to_numpy().nonzero()[0]
         if settled.size == 0:
-            raise NoMarketDataError(symbol, canonical, "no bar in range has a closing price")
+            raise NoMarketDataError(
+                symbol, canonical, "no bar in range has a closing price"
+            )
         logger.warning(
             "%s: %d trailing bar(s) through %s have no closing price; using %s "
-            "as the latest close.",
-            canonical,
-            len(data) - settled[-1] - 1,
-            data["Date"].iloc[-1].date(),
-            data["Date"].iloc[settled[-1]].date(),
+            "as the latest close.", canonical, len(data) - settled[-1] - 1,
+            data["Date"].iloc[-1].date(), data["Date"].iloc[settled[-1]].date(),
         )
 
     # Indicators need a continuous series, so gaps are carried forward. A caller

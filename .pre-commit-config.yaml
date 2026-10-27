@@ -1,3 +1,4 @@
+# FORK(funds): this file does not exist upstream
 repos:
   - repo: local
     hooks:

@@ -6,6 +6,11 @@ from tradingagents.dataflows.errors import (
     VendorNotConfiguredError,
     VendorUnavailableError,
 )
+from tradingagents.dataflows.fund_vendors import (  # FORK(funds): fund
+    FUND_OPTIONAL_CATEGORIES,
+    FUND_TOOLS_CATEGORIES,
+    FUND_VENDOR_METHODS,
+)
 from tradingagents.dataflows.vendors.alpha_vantage import (
     get_balance_sheet as get_alpha_vantage_balance_sheet,
     get_cashflow as get_alpha_vantage_cashflow,
@@ -16,13 +21,8 @@ from tradingagents.dataflows.vendors.alpha_vantage import (
     get_insider_transactions as get_alpha_vantage_insider_transactions,
     get_news as get_alpha_vantage_news,
     get_stock as get_alpha_vantage_stock,
-    get_symbol_matches as get_alpha_vantage_symbol_matches,
 )
 from tradingagents.dataflows.vendors.fred import get_macro_data as get_fred_macro_data
-from tradingagents.dataflows.vendors.hl_fund import get_fund_holdings as get_hl_fund_holdings
-from tradingagents.dataflows.vendors.mstarpy_fund import (
-    get_fund_holdings as get_mstarpy_fund_holdings,
-)
 from tradingagents.dataflows.vendors.polymarket import (
     get_prediction_markets as get_polymarket_prediction_markets,
 )
@@ -48,14 +48,26 @@ logger = logging.getLogger(__name__)
 
 # Tools organized by category
 TOOLS_CATEGORIES = {
-    "core_stock_apis": {"description": "OHLCV stock price data", "tools": ["get_stock_data"]},
+    "core_stock_apis": {
+        "description": "OHLCV stock price data",
+        "tools": [
+            "get_stock_data"
+        ]
+    },
     "technical_indicators": {
         "description": "Technical analysis indicators",
-        "tools": ["get_indicators"],
+        "tools": [
+            "get_indicators"
+        ]
     },
     "fundamental_data": {
         "description": "Company fundamentals",
-        "tools": ["get_fundamentals", "get_balance_sheet", "get_cashflow", "get_income_statement"],
+        "tools": [
+            "get_fundamentals",
+            "get_balance_sheet",
+            "get_cashflow",
+            "get_income_statement"
+        ]
     },
     "news_data": {
         "description": "News and insider data",
@@ -63,55 +75,32 @@ TOOLS_CATEGORIES = {
             "get_news",
             "get_global_news",
             "get_insider_transactions",
-        ],
+        ]
     },
     "macro_data": {
         "description": "Macroeconomic indicators (rates, inflation, labor, growth)",
         "tools": [
             "get_macro_indicators",
-        ],
+        ]
     },
     "prediction_markets": {
         "description": "Market-implied probabilities for forward-looking events",
         "tools": [
             "get_prediction_markets",
-        ],
-    },
-    "fund_fact_sheet_data": {
-        "description": "Fund holdings / fact sheet data, keyed by ISIN",
-        "tools": [
-            "get_fund_fact_sheet",
-        ],
-    },
-    "ticker_symbol_search": {
-        "description": "Ticker/company-name symbol lookup, used to verify Fund Analyst proxy tickers",
-        "tools": [
-            "search_ticker_symbol",
-        ],
-    },
+        ]
+    }
 }
+
+TOOLS_CATEGORIES.update(FUND_TOOLS_CATEGORIES)  # FORK(funds): fund
 
 # Optional enrichment categories. These add macro/event context to the news
 # analyst but are not core to a decision, so a vendor failure here degrades to a
 # sentinel instead of aborting the run (a bad LLM-supplied indicator, a missing
 # key, or a network blip should not crash an analysis over flavour data). Core
 # categories (prices, fundamentals, news) still raise so a broken primary is loud.
-# fund_fact_sheet_data joins this set for a different reason: mstarpy drives a
-# real Chrome session and can legitimately be unavailable in headless/CI
-# environments (see mstarpy_fund.py). The Fund Analyst node's isin_ticker_map
-# fallback is the real safety net; this just keeps a vendor outage from ever
-# raising instead of degrading to a sentinel the node checks for.
-# ticker_symbol_search is optional for the same reason as fund_fact_sheet_data:
-# it's a best-effort check the Fund Analyst can simply skip (no ALPHA_VANTAGE_API_KEY,
-# rate-limited, network error) without that ever blocking a run — see
-# fund_analyst.py's _verify_ticker, which treats an unreachable vendor as "no
-# verdict" rather than a failure.
-OPTIONAL_CATEGORIES = {
-    "macro_data",
-    "prediction_markets",
-    "fund_fact_sheet_data",
-    "ticker_symbol_search",
-}
+OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
+
+OPTIONAL_CATEGORIES |= FUND_OPTIONAL_CATEGORIES  # FORK(funds): fund
 
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
@@ -166,23 +155,8 @@ VENDOR_METHODS = {
     "get_prediction_markets": {
         "polymarket": get_polymarket_prediction_markets,
     },
-    # fund_fact_sheet_data — additional providers plug in here without
-    # touching the Fund Analyst node or the tool. "hl" (Hargreaves Lansdown,
-    # HTML scrape) only covers GB00-domiciled ISINs and declines everything
-    # else instantly (no network call); "mstarpy" (Morningstar via Selenium)
-    # covers any ISIN globally but is slower and Chrome-dependent. Default
-    # chain tries hl first — see default_config.py.
-    "get_fund_fact_sheet": {
-        "mstarpy": get_mstarpy_fund_holdings,
-        "hl": get_hl_fund_holdings,
-    },
-    # ticker_symbol_search — Alpha Vantage only for now; additional providers
-    # (e.g. a second symbol-lookup API) can plug in here later the same way
-    # fund_fact_sheet_data grew a second vendor.
-    "search_ticker_symbol": {
-        "alpha_vantage": get_alpha_vantage_symbol_matches,
-    },
 }
+VENDOR_METHODS.update(FUND_VENDOR_METHODS)  # FORK(funds): fund
 
 
 def get_category_for_method(method: str) -> str:
@@ -237,7 +211,7 @@ def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
-    primary_vendors = [v.strip() for v in vendor_config.split(",")]
+    primary_vendors = [v.strip() for v in vendor_config.split(',')]
 
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")
@@ -262,7 +236,7 @@ def route_to_vendor(method: str, *args, **kwargs):
 
     last_no_data: NoMarketDataError | None = None
     last_unavailable: VendorUnavailableError | None = None
-    failed: Exception | None = None  # a vendor that raised something untyped
+    failed: Exception | None = None     # a vendor that raised something untyped
     first_error: Exception | None = None
     for vendor in vendor_chain:
         vendor_impl = VENDOR_METHODS[method][vendor]
@@ -271,9 +245,7 @@ def route_to_vendor(method: str, *args, **kwargs):
         try:
             return impl_func(*args, **kwargs)
         except VendorUnavailableError as e:
-            logger.warning(
-                "Vendor %r unavailable for %s: %s; trying next vendor.", vendor, method, e
-            )
+            logger.warning("Vendor %r unavailable for %s: %s; trying next vendor.", vendor, method, e)
             # Kept so an all-unavailable chain can say the vendor was the
             # problem, rather than reporting nothing about the symbol.
             last_unavailable = e
@@ -315,8 +287,7 @@ def route_to_vendor(method: str, *args, **kwargs):
             # verdict can't hide a broken primary (network/auth/etc.).
             logger.warning(
                 "Returning NO_DATA for %s, but a vendor errored earlier: %s",
-                method,
-                first_error,
+                method, first_error,
             )
         return no_data_available(last_no_data)
 

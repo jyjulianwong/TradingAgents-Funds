@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+import webbrowser
 from functools import wraps
 from pathlib import Path
 
@@ -48,7 +49,9 @@ def _announce_checkpoint_state(graph, ticker: str, trade_date: str) -> None:
     view owns the screen, so a resume was invisible.
     """
     if getattr(graph, "_resuming", False):
-        message_buffer.add_message("System", f"Resuming the saved run for {ticker} on {trade_date}")
+        message_buffer.add_message(
+            "System", f"Resuming the saved run for {ticker} on {trade_date}"
+        )
     else:
         message_buffer.add_message("System", f"Starting fresh for {ticker} on {trade_date}")
 
@@ -63,10 +66,8 @@ def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
     # Research depth sets both round counts, but an explicit env override
     # (TRADINGAGENTS_MAX_DEBATE_ROUNDS / _MAX_RISK_ROUNDS) wins over the
     # interactive selection — leave the env-applied value in place (#977).
-    rounds = (
-        ("TRADINGAGENTS_MAX_DEBATE_ROUNDS", "max_debate_rounds"),
-        ("TRADINGAGENTS_MAX_RISK_ROUNDS", "max_risk_discuss_rounds"),
-    )
+    rounds = (("TRADINGAGENTS_MAX_DEBATE_ROUNDS", "max_debate_rounds"),
+              ("TRADINGAGENTS_MAX_RISK_ROUNDS", "max_risk_discuss_rounds"))
     depth_was_asked = not depth_from_env()
     for env_var, key in rounds:
         if not os.environ.get(env_var):
@@ -82,10 +83,11 @@ def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
     config["deep_think_llm"] = selections["deep_think_llm"]
     config["backend_url"] = selections["backend_url"]
     config["llm_provider"] = selections["llm_provider"].lower()
-    # Provider-specific thinking configuration
-    config["google_thinking_level"] = selections.get("google_thinking_level")
-    config["openai_reasoning_effort"] = selections.get("openai_reasoning_effort")
-    config["anthropic_effort"] = selections.get("anthropic_effort")
+    # Provider-specific thinking configuration. Only the main provider's is
+    # asked; a tier on another provider keeps its configured value (#1440).
+    for key in ("google_thinking_level", "openai_reasoning_effort", "anthropic_effort"):
+        if selections.get(key) is not None:
+            config[key] = selections[key]
     config["output_language"] = selections.get("output_language", "English")
     # --checkpoint/--no-checkpoint overrides only when explicitly given; omitting
     # the flag preserves TRADINGAGENTS_CHECKPOINT_ENABLED / the default (#976).
@@ -94,6 +96,7 @@ def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
     return config
 
 
+# FORK(funds): visualizer
 def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
     flags = flags or {}
     # With no terminal nothing can answer a prompt: name every question still
@@ -161,7 +164,6 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
             content = content.replace("\n", " ")  # Replace newlines with spaces
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} [{message_type}] {content}\n")
-
         return wrapper
 
     def save_tool_call_decorator(obj, func_name):
@@ -174,7 +176,6 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
             args_str = ", ".join(f"{k}={v}" for k, v in args.items())
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} [Tool Call] {tool_name}({args_str})\n")
-
         return wrapper
 
     def save_report_section_decorator(obj, func_name):
@@ -183,28 +184,18 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
         @wraps(func)
         def wrapper(section_name, content):
             func(section_name, content)
-            if (
-                section_name in obj.report_sections
-                and obj.report_sections[section_name] is not None
-            ):
+            if section_name in obj.report_sections and obj.report_sections[section_name] is not None:
                 content = obj.report_sections[section_name]
                 if content:
                     file_name = f"{section_name}.md"
-                    text = (
-                        "\n".join(str(item) for item in content)
-                        if isinstance(content, list)
-                        else content
-                    )
+                    text = "\n".join(str(item) for item in content) if isinstance(content, list) else content
                     with open(report_dir / file_name, "w", encoding="utf-8") as f:
                         f.write(text)
-
         return wrapper
 
     message_buffer.add_message = save_message_decorator(message_buffer, "add_message")
     message_buffer.add_tool_call = save_tool_call_decorator(message_buffer, "add_tool_call")
-    message_buffer.update_report_section = save_report_section_decorator(
-        message_buffer, "update_report_section"
-    )
+    message_buffer.update_report_section = save_report_section_decorator(message_buffer, "update_report_section")
 
     # Hook agent-status updates to emit visualizer events.
     if _viz_bridge is not None:
@@ -232,6 +223,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
 
     # The alternate screen keeps a layout taller than the window from redrawing
     # by scrolling; the final report prints after this block, on the normal screen.
+    # FORK(funds): visualizer
     with Live(layout, refresh_per_second=4, screen=True):
         # Initial display
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
@@ -239,7 +231,9 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
         message_buffer.add_message("System", f"Selected ticker: {selections['ticker']}")
         if selections["asset_type"] != "stock":
             message_buffer.add_message("System", f"Detected asset type: {selections['asset_type']}")
-        message_buffer.add_message("System", f"Analysis date: {selections['analysis_date']}")
+        message_buffer.add_message(
+            "System", f"Analysis date: {selections['analysis_date']}"
+        )
         message_buffer.add_message(
             "System",
             f"Selected analysts: {', '.join(analyst.value for analyst in selections['analysts'])}",
@@ -252,11 +246,14 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
             analyst_wall_time_tracker.mark_started(spec.key)
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
 
-        spinner_text = f"Analyzing {selections['ticker']} on {selections['analysis_date']}..."
+        spinner_text = (
+            f"Analyzing {selections['ticker']} on {selections['analysis_date']}..."
+        )
         update_display(layout, spinner_text, stats_handler=stats_handler, start_time=start_time)
 
-        # The same initial state propagate() builds: settled memory log, past
-        # context and resolved instrument identity.
+        # The same initial state propagate() builds, with the resolved
+        # instrument identity; the graph's Memory Log step settles past
+        # decisions and loads their lessons alongside the analysts.
         init_agent_state = graph.create_run_state(
             selections["ticker"], selections["analysis_date"], selections["asset_type"], portfolio
         )
@@ -271,9 +268,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
             selections["ticker"], selections["analysis_date"], selections["asset_type"], portfolio
         )
         if checkpoint_tid is not None:
-            args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = (
-                checkpoint_tid
-            )
+            args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = checkpoint_tid
             _announce_checkpoint_state(graph, selections["ticker"], selections["analysis_date"])
 
         # Notify the visualizer that the analysis is starting.
@@ -291,9 +286,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
         # try/finally tears the checkpointer down even if the stream raises.
         trace = []
         try:
-            for messages, chunk in graph.stream_run(
-                graph.checkpoint_input(init_agent_state), **args
-            ):
+            for messages, chunk in graph.stream_run(graph.checkpoint_input(init_agent_state), **args):
                 for message in messages:
                     msg_id = getattr(message, "id", None)
                     if msg_id is not None:
@@ -302,6 +295,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
                         message_buffer._processed_message_ids.add(msg_id)
 
                     msg_type, content = classify_message_type(message)
+                    # FORK(funds): visualizer
                     if content and content.strip():
                         message_buffer.add_message(msg_type, content)
                         # Stream AI message text to the visualizer dialog box
@@ -323,7 +317,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
                             else:
                                 message_buffer.add_tool_call(tool_call.name, tool_call.args)
 
-                if chunk is None:  # a step inside an analyst's graph: messages only
+                if chunk is None:   # a step inside an analyst's graph: messages only
                     update_display(layout, stats_handler=stats_handler, start_time=start_time)
                     continue
 
@@ -383,9 +377,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
                         )
                     if con_hist:
                         if message_buffer.agent_status.get("Conservative Analyst") != "completed":
-                            message_buffer.update_agent_status(
-                                "Conservative Analyst", "in_progress"
-                            )
+                            message_buffer.update_agent_status("Conservative Analyst", "in_progress")
                         message_buffer.update_report_section(
                             "final_trade_decision", f"### Conservative Analyst Analysis\n{con_hist}"
                         )
@@ -395,10 +387,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
                         message_buffer.update_report_section(
                             "final_trade_decision", f"### Neutral Analyst Analysis\n{neu_hist}"
                         )
-                    if (
-                        judge
-                        and message_buffer.agent_status.get("Portfolio Manager") != "completed"
-                    ):
+                    if judge and message_buffer.agent_status.get("Portfolio Manager") != "completed":
                         message_buffer.update_agent_status("Portfolio Manager", "in_progress")
                         message_buffer.update_report_section(
                             "final_trade_decision", f"### Portfolio Manager Decision\n{judge}"
@@ -423,10 +412,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
             # the checkpoint for resume.
             graph.record_decision(selections["ticker"], selections["analysis_date"], final_state)
             graph.clear_checkpoint_on_success(
-                selections["ticker"],
-                selections["analysis_date"],
-                selections["asset_type"],
-                portfolio,
+                selections["ticker"], selections["analysis_date"], selections["asset_type"], portfolio
             )
         finally:
             # Always restore the plain uncheckpointed graph, even on failure.
@@ -470,13 +456,51 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
         )
     console.print(f"[dim]{analyst_wall_time_tracker.format_summary()}[/dim]")
 
-    _offer_reports(
-        final_state, graph, selections["ticker"], save=flags.get("save"), show=flags.get("show")
-    )
+    _offer_reports(final_state, graph, selections["ticker"],
+                   save=flags.get("save"), show=flags.get("show"), html=flags.get("html"))
 
 
-def _offer_reports(final_state, graph, ticker, save=None, show=None):
-    """Save the report tree and show it; ``save``/``show`` answer the questions when given."""
+def _yes(question: str) -> bool:
+    return typer.prompt(question, default="Y").strip().upper() in ("Y", "YES", "")
+
+
+def _graphical_browser():
+    """A browser that opens a page in its own window on this machine, or None.
+
+    Over SSH the page sits on the remote machine, and a terminal browser (lynx,
+    w3m, elinks) would take over the terminal, so neither is offered.
+    """
+    if os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_TTY"):
+        return None
+    try:
+        browser = webbrowser.get()
+    except webbrowser.Error:
+        return None
+    if type(browser) is webbrowser.GenericBrowser or isinstance(browser, webbrowser.Elinks):
+        return None
+    return browser
+
+
+def _open_page(page: Path) -> None:
+    """Offer to open the saved page in a browser window, and say where it is if opening fails."""
+    browser = _graphical_browser()
+    if browser is None or not _yes("Open it in your browser?"):
+        return
+    try:
+        opened = browser.open(page.as_uri())
+    except (webbrowser.Error, OSError):
+        opened = False
+    if not opened:
+        console.print(f"  [dim]Could not open a browser; the page is at:[/dim] {page}")
+
+
+def _offer_reports(final_state, graph, ticker, save=None, show=None, html=None):
+    """Save the report tree and show it; ``save``/``show``/``html`` answer the questions when given.
+
+    A saved report includes the HTML page unless ``html`` is False. Someone
+    answering the save question at the prompt is also asked about the page and
+    offered to open it; a run whose flags answer the save question asks neither.
+    """
     asked = save is None
     if asked:
         save = typer.prompt("Save report?", default="Y").strip().upper() in ("Y", "YES", "")
@@ -485,22 +509,27 @@ def _offer_reports(final_state, graph, ticker, save=None, show=None):
         # directory is inside the container and the report goes with it, while
         # results_dir is the mounted volume the rest of the run already writes to.
         save_path = graph.default_report_path(ticker)
-        if asked:  # someone at the prompt may pick another folder
-            save_path = Path(
-                typer.prompt("Save path (press Enter for default)", default=str(save_path)).strip()
-            )
+        if asked:   # someone at the prompt may pick another folder
+            save_path = Path(typer.prompt(
+                "Save path (press Enter for default)", default=str(save_path)
+            ).strip())
+        if html is None:
+            html = _yes("Also save it as an HTML page?") if asked else True
+        saved = False
         try:
-            report_file = graph.save_reports(final_state, ticker, save_path)
+            report_file = graph.save_reports(final_state, ticker, save_path, html=html)
+            saved = True
             console.print(f"\n[green]✓ Report saved to:[/green] {save_path.resolve()}")
             console.print(f"  [dim]Complete report:[/dim] {report_file.name}")
         except Exception as e:
             console.print(f"[red]Error saving report: {e}[/red]")
+        if saved and html:
+            page = (save_path / "complete_report.html").resolve()
+            console.print(f"  [dim]HTML report:[/dim] {page.name}")
+            if asked:
+                _open_page(page)
 
     if show is None:
-        show = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper() in (
-            "Y",
-            "YES",
-            "",
-        )
+        show = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper() in ("Y", "YES", "")
     if show:
         display_complete_report(final_state)

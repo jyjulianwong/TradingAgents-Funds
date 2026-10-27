@@ -54,8 +54,7 @@ class TestCliSkipsPromptsFromEnv(unittest.TestCase):
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
-             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections.updates, "enabled", return_value=False), \
              mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
              mock.patch.object(cli_selections, "get_analysis_date", return_value="2026-05-29"), \
              mock.patch.object(cli_selections, "select_analysts", return_value=[]), \
@@ -96,8 +95,7 @@ class TestResearchDepthSkippedFromEnv(unittest.TestCase):
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
-             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections.updates, "enabled", return_value=False), \
              mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
              mock.patch.object(cli_selections, "get_analysis_date", return_value="2026-05-29"), \
              mock.patch.object(cli_selections, "select_analysts", return_value=[]), \
@@ -115,6 +113,7 @@ class TestResearchDepthSkippedFromEnv(unittest.TestCase):
         self.assertEqual(sel["research_depth"], 2)
 
 
+# FORK(funds): cli-presets
 @pytest.mark.unit
 class TestAnalysisDateSkippedFromEnv(unittest.TestCase):
     def test_analysis_date_env_skips_step2_prompt(self):
@@ -125,8 +124,7 @@ class TestAnalysisDateSkippedFromEnv(unittest.TestCase):
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
-             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections.updates, "enabled", return_value=False), \
              mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
              mock.patch.object(cli_selections, "get_analysis_date") as prompt_date, \
              mock.patch.object(cli_selections, "select_analysts", return_value=[]), \
@@ -154,8 +152,7 @@ class TestAnalystsSkippedFromEnv(unittest.TestCase):
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
-             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections.updates, "enabled", return_value=False), \
              mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
              mock.patch.object(cli_selections, "get_analysis_date", return_value="2026-05-29"), \
              mock.patch.object(cli_selections, "select_analysts") as prompt_analysts, \
@@ -181,8 +178,7 @@ class TestAnalystsSkippedFromEnv(unittest.TestCase):
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
-             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections.updates, "enabled", return_value=False), \
              mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
              mock.patch.object(cli_selections, "get_analysis_date", return_value="2026-05-29"), \
              mock.patch.object(cli_selections, "ask_output_language", return_value="English"), \
@@ -200,8 +196,7 @@ class TestReasoningEffortSkippedFromEnv(unittest.TestCase):
 
         with mock.patch.dict(os.environ, env, clear=False), \
              mock.patch.object(cli_selections, "DEFAULT_CONFIG", fake_cfg), \
-             mock.patch.object(cli_selections, "fetch_announcements", return_value=None), \
-             mock.patch.object(cli_selections, "display_announcements"), \
+             mock.patch.object(cli_selections.updates, "enabled", return_value=False), \
              mock.patch.object(cli_selections, "get_ticker", return_value="AAPL"), \
              mock.patch.object(cli_selections, "get_analysis_date", return_value="2026-05-29"), \
              mock.patch.object(cli_selections, "select_analysts", return_value=[]), \

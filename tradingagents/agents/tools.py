@@ -4,7 +4,7 @@ Each dated tool takes the run's ``trade_date`` from graph state (``InjectedState
 and never serves data past it, whatever date the model asks for.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
@@ -16,6 +16,7 @@ from tradingagents.dataflows.router import no_data_available, route_to_vendor, v
 from tradingagents.dataflows.vendors.yahoo.snapshot import build_verified_market_snapshot
 
 
+# FORK(funds): ohlcv-interval
 @tool
 def get_stock_data(
     symbol: Annotated[str, InjectedState("company_of_interest")],
@@ -39,11 +40,16 @@ def get_stock_data(
     Returns:
         str: A formatted dataframe containing the price data for the instrument over the date range.
     """
+    # FORK(funds): ohlcv-interval
     if interval is None:
         from tradingagents.dataflows.config import get_config
 
         interval = get_config().get("tool_vendors", {}).get("ohlcv_interval", "1d")
-    start_date, end_date = as_of_window(start_date, end_date, trade_date)
+    try:
+        start_date, end_date = as_of_window(start_date, end_date, trade_date)
+    except ValueError as e:
+        return str(e)
+    # FORK(funds): ohlcv-interval
     return route_to_vendor("get_stock_data", symbol, start_date, end_date, interval)
 
 
@@ -71,13 +77,12 @@ def get_indicators(
     indicators = [i.strip().lower() for i in indicator.split(",") if i.strip()]
     results = []
     for ind in indicators:
+        # FORK(funds): fund
         if ind == "atr" and is_isin(symbol.strip().upper()):
             results.append(f"ATR not applicable — OEIC O/H/L data is not published for {symbol}.")
             continue
         try:
-            results.append(
-                route_to_vendor("get_indicators", symbol, ind, curr_date, look_back_days)
-            )
+            results.append(route_to_vendor("get_indicators", symbol, ind, curr_date, look_back_days))
         except ValueError as e:
             results.append(str(e))
     return "\n\n".join(results)
@@ -128,7 +133,7 @@ def get_fundamentals(
 @tool
 def get_balance_sheet(
     ticker: Annotated[str, InjectedState("company_of_interest")],
-    freq: Annotated[str, "reporting frequency: annual/quarterly"] = "quarterly",
+    freq: Annotated[Literal["annual", "quarterly"], "reporting frequency"] = "quarterly",
     curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"] = None,
     trade_date: Annotated[str, InjectedState("trade_date")] = "",
 ) -> str:
@@ -147,7 +152,7 @@ def get_balance_sheet(
 @tool
 def get_cashflow(
     ticker: Annotated[str, InjectedState("company_of_interest")],
-    freq: Annotated[str, "reporting frequency: annual/quarterly"] = "quarterly",
+    freq: Annotated[Literal["annual", "quarterly"], "reporting frequency"] = "quarterly",
     curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"] = None,
     trade_date: Annotated[str, InjectedState("trade_date")] = "",
 ) -> str:
@@ -166,7 +171,7 @@ def get_cashflow(
 @tool
 def get_income_statement(
     ticker: Annotated[str, InjectedState("company_of_interest")],
-    freq: Annotated[str, "reporting frequency: annual/quarterly"] = "quarterly",
+    freq: Annotated[Literal["annual", "quarterly"], "reporting frequency"] = "quarterly",
     curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"] = None,
     trade_date: Annotated[str, InjectedState("trade_date")] = "",
 ) -> str:
@@ -198,19 +203,18 @@ def get_news(
     Returns:
         str: A formatted string containing news data
     """
-    start_date, end_date = as_of_window(start_date, end_date, trade_date)
+    try:
+        start_date, end_date = as_of_window(start_date, end_date, trade_date)
+    except ValueError as e:
+        return str(e)
     return route_to_vendor("get_news", ticker, start_date, end_date)
 
 
 @tool
 def get_global_news(
     curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
-    look_back_days: Annotated[
-        int | None, "Days to look back; omit to use the configured default"
-    ] = None,
-    limit: Annotated[
-        int | None, "Max articles to return; omit to use the configured default"
-    ] = None,
+    look_back_days: Annotated[int | None, "Days to look back; omit to use the configured default"] = None,
+    limit: Annotated[int | None, "Max articles to return; omit to use the configured default"] = None,
     trade_date: Annotated[str, InjectedState("trade_date")] = "",
 ) -> str:
     """
@@ -250,7 +254,9 @@ def get_macro_indicators(
         str,
         "Macro indicator: a friendly alias such as 'cpi', 'core_pce', "
         "'unemployment', 'fed_funds_rate', '10y_treasury', 'yield_curve', "
-        "'real_gdp', 'vix', or a raw FRED series ID such as 'CPIAUCSL'.",
+        "'real_gdp', 'vix', euro-area aliases such as 'ecb_deposit_rate', "
+        "'euro_hicp', 'euro_core_hicp', 'euro_real_gdp', 'germany_10y', "
+        "'france_10y', 'eur_usd', or a raw FRED series ID such as 'CPIAUCSL'.",
     ],
     curr_date: Annotated[str, "Current date in yyyy-mm-dd format; the end of the window"],
     look_back_days: Annotated[
@@ -260,7 +266,8 @@ def get_macro_indicators(
 ) -> str:
     """
     Retrieve a macroeconomic indicator time series from FRED (Federal Reserve
-    Economic Data): policy rates, Treasury yields, inflation, labor, and growth.
+    Economic Data): policy rates, Treasury yields, inflation, labor, and growth,
+    for the US and, through FRED's mirrored series, the euro area.
     Returns the series title, units, frequency, the latest value, the change
     over the window, and a recent observation table. Uses the configured
     macro_data vendor.
@@ -273,9 +280,7 @@ def get_macro_indicators(
     Returns:
         str: A formatted markdown report of the macro series
     """
-    return route_to_vendor(
-        "get_macro_indicators", indicator, as_of(curr_date, trade_date), look_back_days
-    )
+    return route_to_vendor("get_macro_indicators", indicator, as_of(curr_date, trade_date), look_back_days)
 
 
 @tool

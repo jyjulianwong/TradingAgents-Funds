@@ -8,7 +8,7 @@ import typer
 from rich.align import Align
 from rich.panel import Panel
 
-from cli.announcements import display_announcements, fetch_announcements
+from cli import updates
 from cli.display import (
     console,
 )
@@ -25,6 +25,7 @@ from cli.prompts import (
     confirm_ollama_endpoint,
     detect_asset_type,
     ensure_api_key,
+    ensure_signed_in,
     filter_analysts_for_asset_type,
     get_ticker,
     parse_analysis_date,
@@ -39,6 +40,8 @@ from cli.prompts import (
     select_shallow_thinking_agent,
 )
 from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.llm_clients.factory import REASONING_EFFORT_PROVIDERS
+from tradingagents.llm_clients.openai_client import check_endpoint
 
 
 def get_user_selections(flags=None):
@@ -50,10 +53,8 @@ def get_user_selections(flags=None):
 
 def depth_from_env() -> bool:
     """Both round counts come from the environment, so the depth question is skipped."""
-    return bool(
-        os.environ.get("TRADINGAGENTS_MAX_DEBATE_ROUNDS")
-        and os.environ.get("TRADINGAGENTS_MAX_RISK_ROUNDS")
-    )
+    return bool(os.environ.get("TRADINGAGENTS_MAX_DEBATE_ROUNDS")
+                and os.environ.get("TRADINGAGENTS_MAX_RISK_ROUNDS"))
 
 
 def unattended_gaps(flags) -> list[str]:
@@ -72,6 +73,38 @@ def unattended_gaps(flags) -> list[str]:
     return gaps
 
 
+def _check_tier_providers(main_provider: str, backend_url: str | None = None) -> None:
+    """Check each provider the model tiers use (#1440) before the run.
+
+    A tier on another provider needs its model from its variable, since the
+    model question offers the main provider's models. Each provider a tier uses
+    has its endpoint, sign-in and key checked now, prompting for a missing key,
+    rather than at its first call, which for the deep tier comes after everything
+    else has been paid for; a provider no tier uses needs no key.
+    """
+    used = []
+    for tier in ("quick", "deep"):
+        provider = (DEFAULT_CONFIG.get(f"{tier}_think_provider") or main_provider).lower()
+        on_main = provider == main_provider.lower()
+        if not on_main:
+            variable = f"TRADINGAGENTS_{tier.upper()}_THINK_LLM"
+            if not os.environ.get(variable):
+                console.print(f"[red]The {tier} tier runs on {provider}; set {variable} to one of its models.[/red]")
+                raise typer.Exit(code=1)
+        # The tier's endpoint, as create_tier_client resolves it.
+        url = DEFAULT_CONFIG.get(f"{tier}_think_backend_url") or (backend_url if on_main else None)
+        try:
+            check_endpoint(provider, url)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1) from None
+        if provider not in used:
+            used.append(provider)
+    for provider in used:
+        ensure_signed_in(provider)
+        ensure_api_key(provider)
+
+
 def _from_flag(parse, value, *args):
     """A flag's value through the same check its prompt applies; a bad one ends the run."""
     try:
@@ -81,6 +114,7 @@ def _from_flag(parse, value, *args):
         raise typer.Exit(code=1) from None
 
 
+# FORK(funds): cli-presets
 def _prompt_selections(prefs, flags):
     """Walk the selection steps. ``prefs`` prefills; flags and the environment skip."""
     with open(Path(__file__).parent / "static" / "welcome.txt", encoding="utf-8") as f:
@@ -90,7 +124,9 @@ def _prompt_selections(prefs, flags):
     welcome_content += "[bold green]TradingAgents: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
     welcome_content += "[bold]Workflow Steps:[/bold]\n"
     welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
-    welcome_content += "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
+    welcome_content += (
+        "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
+    )
 
     welcome_box = Panel(
         welcome_content,
@@ -103,9 +139,11 @@ def _prompt_selections(prefs, flags):
     console.print()
     console.print()  # Add vertical space before announcements
 
-    # Fetch and display announcements (silent on failure)
-    announcements = fetch_announcements()
-    display_announcements(console, announcements)
+    # What's new comes from a cache refreshed in the background, and only for
+    # someone at a terminal: a run never waits on it and unattended runs skip it.
+    if updates.enabled():
+        updates.show(console)
+        updates.start_background_refresh()
 
     def create_question_box(title, prompt, default=None):
         box_content = f"[bold]{title}[/bold]\n"
@@ -145,7 +183,9 @@ def _prompt_selections(prefs, flags):
     # Only announce when it's not the default stock path, to avoid printing
     # "stock" on every run.
     if asset_type.value != "stock":
-        console.print(f"[green]Detected asset type:[/green] {asset_type.value}")
+        console.print(
+            f"[green]Detected asset type:[/green] {asset_type.value}"
+        )
 
     # Step 2: Analysis date (skipped when set via TRADINGAGENTS_ANALYSIS_DATE or --date)
     if DEFAULT_CONFIG.get("analysis_date"):
@@ -168,18 +208,21 @@ def _prompt_selections(prefs, flags):
     # Step 3: Output language (skipped when set via TRADINGAGENTS_OUTPUT_LANGUAGE)
     if os.environ.get("TRADINGAGENTS_OUTPUT_LANGUAGE"):
         output_language = DEFAULT_CONFIG["output_language"]
-        console.print(f"[green]✓ Output language from environment:[/green] {output_language}")
+        console.print(
+            f"[green]✓ Output language from environment:[/green] {output_language}"
+        )
     else:
         console.print(
             create_question_box(
                 "Step 3: Output Language",
-                "Select the language for analyst reports and final decision",
+                "Select the language for analyst reports and final decision"
             )
         )
         output_language = ask_output_language(prefs.get("output_language"))
 
     # Step 4: Select analysts (skipped when set via TRADINGAGENTS_ANALYSTS or --analysts)
     prefs = sanitize(prefs, asset_type.value)
+    # FORK(funds): cli-presets
     if DEFAULT_CONFIG.get("analysts"):
         raw_analysts = DEFAULT_CONFIG["analysts"]
         valid_values = {a.value for a in AnalystType}
@@ -201,6 +244,7 @@ def _prompt_selections(prefs, flags):
         )
     elif flags.get("analysts") is not None:
         selected_analysts = _from_flag(parse_analysts, flags["analysts"], asset_type)
+        # FORK(funds): cli-presets
         console.print(
             f"[green]✓ Analysts from --analysts:[/green] "
             f"{', '.join(a.value for a in selected_analysts)}"
@@ -212,6 +256,7 @@ def _prompt_selections(prefs, flags):
             )
         )
         selected_analysts = select_analysts(asset_type, prefs.get("analysts"))
+        # FORK(funds): cli-presets
         console.print(
             f"[green]Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
         )
@@ -229,7 +274,9 @@ def _prompt_selections(prefs, flags):
         )
     else:
         console.print(
-            create_question_box("Step 5: Research Depth", "Select your research depth level")
+            create_question_box(
+                "Step 5: Research Depth", "Select your research depth level"
+            )
         )
         selected_research_depth = select_research_depth(prefs.get("research_depth"))
 
@@ -245,10 +292,12 @@ def _prompt_selections(prefs, flags):
         )
         console.print(f"[green]✓ LLM provider from environment:[/green] {selected_llm_provider}")
         console.print(f"[green]✓ Backend URL:[/green] {backend_url}")
-        # Still confirm/persist the API key so the run doesn't fail later.
-        ensure_api_key(selected_llm_provider)
     else:
-        console.print(create_question_box("Step 6: LLM Provider", "Select your LLM provider"))
+        console.print(
+            create_question_box(
+                "Step 6: LLM Provider", "Select your LLM provider"
+            )
+        )
         selected_llm_provider, backend_url = select_llm_provider(prefs.get("llm_provider"))
 
         # Providers with regional endpoints prompt for the region as a secondary
@@ -270,11 +319,8 @@ def _prompt_selections(prefs, flags):
         # The generic OpenAI-compatible endpoint has no default; ask for it if
         # neither the menu nor the environment supplied one.
         if selected_llm_provider == "openai_compatible" and not backend_url:
-            remembered_url = (
-                prefs.get("backend_url")
-                if prefs.get("llm_provider") == selected_llm_provider
-                else None
-            )
+            remembered_url = (prefs.get("backend_url")
+                              if prefs.get("llm_provider") == selected_llm_provider else None)
             backend_url = prompt_openai_compatible_url(remembered_url)
 
         # For Ollama, surface the resolved endpoint (OLLAMA_BASE_URL vs default)
@@ -282,15 +328,11 @@ def _prompt_selections(prefs, flags):
         if selected_llm_provider == "ollama":
             confirm_ollama_endpoint(backend_url)
 
-        # Confirm the provider's API key is present; prompt the user to paste
-        # one and persist it to .env if it's missing, so the analysis run
-        # doesn't fail later at the first API call.
-        ensure_api_key(selected_llm_provider)
+
+    _check_tier_providers(selected_llm_provider, backend_url)
 
     # Step 7: Thinking agents (skipped when either model is set via environment)
-    if os.environ.get("TRADINGAGENTS_QUICK_THINK_LLM") or os.environ.get(
-        "TRADINGAGENTS_DEEP_THINK_LLM"
-    ):
+    if os.environ.get("TRADINGAGENTS_QUICK_THINK_LLM") or os.environ.get("TRADINGAGENTS_DEEP_THINK_LLM"):
         selected_shallow_thinker = DEFAULT_CONFIG["quick_think_llm"]
         selected_deep_thinker = DEFAULT_CONFIG["deep_think_llm"]
         console.print(
@@ -327,30 +369,21 @@ def _prompt_selections(prefs, flags):
         anthropic_effort = DEFAULT_CONFIG["anthropic_effort"]
     elif provider_lower == "google":
         thinking_level = thinking_value_or_prompt(
-            "TRADINGAGENTS_GOOGLE_THINKING_LEVEL",
-            "google_thinking_level",
-            "Gemini thinking mode",
-            "Step 8: Thinking Mode",
-            "Configure Gemini thinking mode",
-            ask_gemini_thinking_config,
+            "TRADINGAGENTS_GOOGLE_THINKING_LEVEL", "google_thinking_level",
+            "Gemini thinking mode", "Step 8: Thinking Mode",
+            "Configure Gemini thinking mode", ask_gemini_thinking_config,
         )
-    elif provider_lower == "openai":
+    elif provider_lower in REASONING_EFFORT_PROVIDERS:
         reasoning_effort = thinking_value_or_prompt(
-            "TRADINGAGENTS_OPENAI_REASONING_EFFORT",
-            "openai_reasoning_effort",
-            "Reasoning effort",
-            "Step 8: Reasoning Effort",
-            "Configure OpenAI reasoning effort level",
-            ask_openai_reasoning_effort,
+            "TRADINGAGENTS_OPENAI_REASONING_EFFORT", "openai_reasoning_effort",
+            "Reasoning effort", "Step 8: Reasoning Effort",
+            "Configure OpenAI reasoning effort level", ask_openai_reasoning_effort,
         )
     elif provider_lower == "anthropic":
         anthropic_effort = thinking_value_or_prompt(
-            "TRADINGAGENTS_ANTHROPIC_EFFORT",
-            "anthropic_effort",
-            "Claude effort",
-            "Step 8: Effort Level",
-            "Configure Claude effort level",
-            ask_anthropic_effort,
+            "TRADINGAGENTS_ANTHROPIC_EFFORT", "anthropic_effort",
+            "Claude effort", "Step 8: Effort Level",
+            "Configure Claude effort level", ask_anthropic_effort,
         )
 
     return {
@@ -373,7 +406,9 @@ def _prompt_selections(prefs, flags):
 def get_analysis_date():
     """Get the analysis date from user input."""
     while True:
-        date_str = typer.prompt("", default=datetime.datetime.now().strftime("%Y-%m-%d"))
+        date_str = typer.prompt(
+            "", default=datetime.datetime.now().strftime("%Y-%m-%d")
+        )
         try:
             return parse_analysis_date(date_str)
         except ValueError as exc:

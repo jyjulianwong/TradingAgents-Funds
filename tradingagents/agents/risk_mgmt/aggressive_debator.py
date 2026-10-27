@@ -11,6 +11,7 @@ from tradingagents.agents.markdown import ensure_blank_line_before_tables
 
 def create_aggressive_debator(llm):
     def aggressive_node(state) -> dict:
+        # FORK(funds): fund
         ticker = state["company_of_interest"]
         risk_debate_state = state["risk_debate_state"]
         history = risk_debate_state.get("history", "")
@@ -32,6 +33,7 @@ def create_aggressive_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
+        # FORK(funds): fund
         prompt = (
             f"""As the Aggressive Risk Analyst, your role is to actively champion high-reward, high-risk opportunities, emphasizing bold strategies and competitive advantages. When evaluating the trader's decision or plan, focus intently on the potential upside, growth potential, and innovative benefits—even when these come with elevated risk. Use the provided market data and sentiment analysis to strengthen your arguments and challenge the opposing views. Specifically, respond directly to each point made by the conservative and neutral analysts, countering with data-driven rebuttals and persuasive reasoning. Highlight where their caution might miss critical opportunities or where their assumptions may be overly conservative. Here is the trader's decision:
 
@@ -54,6 +56,7 @@ Engage actively by addressing any specific concerns raised, refuting the weaknes
 
         response = llm.invoke(prompt)
 
+        # FORK(funds): markdown-tables
         argument = f"Aggressive Analyst: {ensure_blank_line_before_tables(response.content)}"
 
         new_risk_debate_state = {
@@ -63,10 +66,10 @@ Engage actively by addressing any specific concerns raised, refuting the weaknes
             "neutral_history": risk_debate_state.get("neutral_history", ""),
             "latest_speaker": "Aggressive",
             "current_aggressive_response": argument,
-            "current_conservative_response": risk_debate_state.get(
-                "current_conservative_response", ""
+            "current_conservative_response": risk_debate_state.get("current_conservative_response", ""),
+            "current_neutral_response": risk_debate_state.get(
+                "current_neutral_response", ""
             ),
-            "current_neutral_response": risk_debate_state.get("current_neutral_response", ""),
             "count": risk_debate_state["count"] + 1,
         }
 

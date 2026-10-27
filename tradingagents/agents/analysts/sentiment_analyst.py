@@ -5,7 +5,7 @@ prompt, so the model reports on data it was given rather than inventing posts:
 
   1. News headlines: Yahoo Finance
   2. StockTwits messages: the cashtag stream, with Bullish/Bearish tags
-  3. Reddit posts: r/wallstreetbets, r/stocks, r/investing
+  3. Reddit posts: r/wallstreetbets, r/stocks, r/investing, or crypto communities for a crypto pair
 
 Each source is trimmed to the analysis window. With a TypeSafe key, the social
 posts are screened by Jev first (see post_screen). These feeds serve recent items
@@ -37,12 +37,19 @@ from tradingagents.agents.structured import (
     invoke_structured_or_freetext,
 )
 from tradingagents.agents.tools import get_news
-from tradingagents.dataflows.vendors.reddit import fetch_reddit_posts
+from tradingagents.dataflows.vendors.reddit import (
+    CRYPTO_SUBREDDITS,
+    DEFAULT_SUBREDDITS,
+    fetch_reddit_posts,
+    subreddits_for,
+)
 from tradingagents.dataflows.vendors.stocktwits import fetch_stocktwits_messages
 
+# FORK(funds): fund
 logger = logging.getLogger(__name__)
 
 
+# FORK(funds): fund
 def _fetch_multi_ticker_blocks(
     isin: str,
     mapped_tickers: list[str],
@@ -105,9 +112,11 @@ def create_sentiment_analyst(llm):
     """
     structured_llm = bind_structured(llm, SentimentReport, "Sentiment Analyst")
 
+    # FORK(funds): fund
     def sentiment_analyst_node(state):
         ticker = state["company_of_interest"]
         end_date = state["trade_date"]
+        # FORK(funds): sentiment-window
         start_date = _thirty_days_back(end_date)
         instrument_context = get_instrument_context_from_state(state)
 
@@ -123,6 +132,7 @@ def create_sentiment_analyst(llm):
         # Pre-fetch all three sources. Each fetcher degrades gracefully and
         # returns a string (no exceptions surface from here), so the LLM
         # always sees something — either real data or a clear placeholder.
+        # FORK(funds): fund
         if is_mapped:
             news_block, stocktwits_block, reddit_block = _fetch_multi_ticker_blocks(
                 isin=ticker,
@@ -130,6 +140,7 @@ def create_sentiment_analyst(llm):
                 start_date=start_date,
                 end_date=end_date,
             )
+            subreddits = DEFAULT_SUBREDDITS
         else:
             news_block = get_news.func(ticker, start_date, end_date)
             # Pass the analysis window so a historical run trims social posts to it
@@ -138,10 +149,12 @@ def create_sentiment_analyst(llm):
             stocktwits_block = fetch_stocktwits_messages(
                 ticker, limit=30, start_date=start_date, end_date=end_date, screen=screen
             )
+            subreddits = subreddits_for(ticker)
             reddit_block = fetch_reddit_posts(
-                ticker, start_date=start_date, end_date=end_date, screen=screen
+                ticker, subreddits, start_date=start_date, end_date=end_date, screen=screen
             )
 
+        # FORK(funds): fund
         system_message = _build_system_message(
             ticker=ticker,
             start_date=start_date,
@@ -150,6 +163,7 @@ def create_sentiment_analyst(llm):
             stocktwits_block=stocktwits_block,
             reddit_block=reddit_block,
             mapped_tickers=sentiment_tickers if is_mapped else None,
+            subreddits=subreddits,
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -162,7 +176,8 @@ def create_sentiment_analyst(llm):
                     # prompt, so tool-range wording would only invite a
                     # hallucinated tool call (#1130).
                     " Today's date is {current_date}; treat it as 'now' for all analysis. {instrument_context}"
-                    " " + NO_EXTERNAL_TOOLS + "\n{system_message}",
+                    " " + NO_EXTERNAL_TOOLS +
+                    "\n{system_message}",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
@@ -193,6 +208,7 @@ def create_sentiment_analyst(llm):
     return sentiment_analyst_node
 
 
+# FORK(funds): fund
 def _build_system_message(
     *,
     ticker: str,
@@ -202,6 +218,7 @@ def _build_system_message(
     stocktwits_block: str,
     reddit_block: str,
     mapped_tickers: list[str] | None = None,
+    subreddits: tuple[str, ...] = DEFAULT_SUBREDDITS,
 ) -> str:
     """Assemble the sentiment-analyst system message with structured data blocks.
 
@@ -225,6 +242,13 @@ def _build_system_message(
         )
     else:
         subject_description = ticker
+    if subreddits == DEFAULT_SUBREDDITS:
+        character = "r/wallstreetbets is often contrarian/exuberant; r/stocks more measured; r/investing longer-term"
+    elif len(subreddits) > len(CRYPTO_SUBREDDITS):
+        character = f"r/{subreddits[0]} leans toward the coin's holders; r/CryptoCurrency and r/CryptoMarkets are broader"
+    else:
+        character = "r/CryptoCurrency and r/CryptoMarkets are broad crypto communities"
+    # FORK(funds): fund
     return f"""You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {subject_description} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
 
 ## Data sources (pre-fetched, in this prompt)
@@ -243,8 +267,8 @@ Fast-moving signal. Each message carries a user-labeled sentiment tag (Bullish /
 {stocktwits_block}
 <end_of_stocktwits>
 
-### Reddit posts — r/wallstreetbets, r/stocks, r/investing (past 7 days)
-Community discussion, without vote or comment counts. Subreddit character matters (r/wallstreetbets is often contrarian/exuberant; r/stocks more measured; r/investing longer-term).
+### Reddit posts — {", ".join(f"r/{sub}" for sub in subreddits)} (past 7 days)
+Community discussion, without vote or comment counts. Subreddit character matters ({character}).
 
 <start_of_reddit>
 {reddit_block}
@@ -277,4 +301,4 @@ Fill the following fields:
 - **confidence**: low / medium / high, based on data quality and sample size.
 - **narrative**: Full source-by-source breakdown, divergences, dominant narrative themes, catalysts and risks, and a markdown summary table of key sentiment signals (direction, source, supporting evidence).
 
-{get_autonomous_agent_instruction()}{get_language_instruction()}"""  # TODO: Hotfix #0001
+{get_autonomous_agent_instruction()}{get_language_instruction()}"""  # FORK(funds): hotfix #0001

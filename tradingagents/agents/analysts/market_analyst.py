@@ -21,6 +21,7 @@ TOOLS = (
 
 def create_market_analyst(llm):
     def market_analyst_node(state):
+        # FORK(funds): fund
         ticker = state["company_of_interest"]
         current_date = state["trade_date"]
         instrument_context = get_instrument_context_from_state(state)
@@ -31,7 +32,7 @@ def create_market_analyst(llm):
         if mapped_tickers:
             symbols_fmt = ", ".join(f"`{s}`" for s in symbol_list)
             proxies_fmt = ", ".join(f"`{t}`" for t in mapped_tickers)
-            # TODO: Hotfix #0002
+            # FORK(funds): hotfix #0002
             isin_note = (
                 f"\n\nThis instrument is a fund identified by ISIN `{ticker}`. Its"
                 f" price reflects the fund's Net Asset Value (NAV), computed once per"
@@ -90,8 +91,8 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
             + isin_note
             + fund_note
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
-            + " When calling get_stock_data, default to the '1d' interval unless the data clearly warrants a different granularity."  # TODO: Hotfix #0001
-            + get_autonomous_agent_instruction()  # TODO: Hotfix #0001
+            + " When calling get_stock_data, default to the '1d' interval unless the data clearly warrants a different granularity."  # FORK(funds): hotfix #0001
+            + get_autonomous_agent_instruction()  # FORK(funds): hotfix #0001
             + get_language_instruction()
         )
 
@@ -118,6 +119,7 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
         prompt = prompt.partial(instrument_context=instrument_context)
 
         result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        # FORK(funds): markdown-tables
         if report:
             report = ensure_blank_line_before_tables(report)
 
