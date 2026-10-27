@@ -125,6 +125,7 @@ def test_future_curr_date_from_the_model_is_clamped():
 @pytest.mark.unit
 def test_future_window_from_the_model_is_clamped():
     args = _run(tools.get_stock_data, {"start_date": "2026-08-01", "end_date": "2026-09-14"}, tools)
+    # FORK(funds): ohlcv-interval
     assert args == ("get_stock_data", "NVDA", "2026-08-01", TRADE_DATE, "1d")
 
 

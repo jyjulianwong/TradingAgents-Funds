@@ -7,6 +7,7 @@ _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 # entry-point script changes required. Coercion is driven by the type
 # of the existing default, so users can keep writing plain strings in
 # their .env file.
+# FORK(funds): visualizer
 _ENV_OVERRIDES = {
     "TRADINGAGENTS_LLM_PROVIDER":         "llm_provider",
     "TRADINGAGENTS_DEEP_THINK_LLM":       "deep_think_llm",
@@ -85,6 +86,7 @@ def build_default_config() -> dict:
     Read when the package is imported, as DEFAULT_CONFIG; call it again to see
     the environment as it is now.
     """
+    # FORK(funds): ohlcv-interval
     return _apply_env_overrides({
         "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR") or os.path.join(_TRADINGAGENTS_HOME, "logs"),
         "data_cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR") or os.path.join(_TRADINGAGENTS_HOME, "cache"),

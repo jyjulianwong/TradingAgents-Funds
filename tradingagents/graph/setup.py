@@ -107,6 +107,7 @@ class GraphSetup:
         self.conditional_logic = conditional_logic
         self.max_tool_rounds = max_tool_rounds
 
+    # FORK(funds): fund
     def setup_graph(
         self, selected_analysts=("market", "social", "news", "fundamentals"), memory_node=None
     ):
@@ -174,6 +175,7 @@ class GraphSetup:
         first_steps = list(analysts)
         if memory_node is not None:
             workflow.add_node("Memory Log", memory_node)
+            # FORK(funds): fund
             workflow.add_edge(START, "Memory Log")
             first_steps.append("Memory Log")
         workflow.add_edge(first_steps, "Bull Researcher")

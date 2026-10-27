@@ -15,6 +15,7 @@ from tradingagents.dataflows.vendors.yahoo.ohlcv import _assert_ohlcv_not_stale,
 logger = logging.getLogger(__name__)
 
 
+# FORK(funds): ohlcv-interval
 def get_YFin_data_online(
     symbol: Annotated[str, "ticker symbol of the company"],
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
@@ -26,12 +27,14 @@ def get_YFin_data_online(
 
     # Resolve broker/forex symbols to Yahoo's convention (XAUUSD+ -> GC=F).
     canonical = normalize_symbol(symbol)
+    # FORK(funds): fund
     ticker = yf.Ticker(canonical)
 
     # yfinance treats ``end`` as EXCLUSIVE, so it would drop the requested
     # end_date row (and the current day when end_date is today). Request one day
     # past end_date so the requested range is actually inclusive (#986/#987).
     end_inclusive = (end_dt + relativedelta(days=1)).strftime("%Y-%m-%d")
+    # FORK(funds): ohlcv-interval
     data = yf_retry(lambda: ticker.history(start=start_date, end=end_inclusive, interval=interval))
 
     # Empty result means the symbol is unknown/delisted. Raise a typed error

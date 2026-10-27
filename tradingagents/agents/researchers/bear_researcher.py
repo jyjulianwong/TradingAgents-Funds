@@ -10,6 +10,7 @@ from tradingagents.agents.markdown import ensure_blank_line_before_tables
 
 def create_bear_researcher(llm):
     def bear_node(state) -> dict:
+        # FORK(funds): fund
         ticker = state["company_of_interest"]
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
@@ -31,6 +32,7 @@ def create_bear_researcher(llm):
             else "Asset fundamentals report (may be unavailable for crypto)"
         )
 
+        # FORK(funds): fund
         prompt = (
             f"""You are a Bear Analyst making the case against investing in the {target_label}. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
 
@@ -60,6 +62,7 @@ Use this information to deliver a compelling bear argument, refute the bull's cl
 
         response = llm.invoke(prompt)
 
+        # FORK(funds): markdown-tables
         argument = f"Bear Analyst: {ensure_blank_line_before_tables(response.content)}"
 
         new_investment_debate_state = {

@@ -22,9 +22,11 @@ def test_get_yfin_requests_inclusive_end(monkeypatch):
         def __init__(self, symbol):
             pass
 
+        # FORK(funds): ohlcv-interval
         def history(self, start, end, interval="1d"):
             captured["start"] = start
             captured["end"] = end
+            # FORK(funds): ohlcv-interval
             captured["interval"] = interval
             idx = pd.to_datetime(["2025-05-08", "2025-05-09"])
             return pd.DataFrame(

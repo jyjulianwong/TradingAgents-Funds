@@ -73,6 +73,7 @@ class StaleGuardPropagationTests(unittest.TestCase):
             def __init__(self, symbol):
                 pass
 
+            # FORK(funds): ohlcv-interval
             def history(self, start, end, interval="1d"):
                 return stale
 

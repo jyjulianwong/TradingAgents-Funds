@@ -96,6 +96,7 @@ def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
     return config
 
 
+# FORK(funds): visualizer
 def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
     flags = flags or {}
     # With no terminal nothing can answer a prompt: name every question still
@@ -222,6 +223,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
 
     # The alternate screen keeps a layout taller than the window from redrawing
     # by scrolling; the final report prints after this block, on the normal screen.
+    # FORK(funds): visualizer
     with Live(layout, refresh_per_second=4, screen=True):
         # Initial display
         update_display(layout, stats_handler=stats_handler, start_time=start_time)
@@ -293,6 +295,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
                         message_buffer._processed_message_ids.add(msg_id)
 
                     msg_type, content = classify_message_type(message)
+                    # FORK(funds): visualizer
                     if content and content.strip():
                         message_buffer.add_message(msg_type, content)
                         # Stream AI message text to the visualizer dialog box

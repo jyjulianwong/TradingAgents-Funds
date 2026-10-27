@@ -100,6 +100,7 @@ def _run_load(monkeypatch, tmp_path, frame, curr_date):
     monkeypatch.setattr(ohlcv, "get_config", lambda: {"data_cache_dir": str(tmp_path)})
     today = pd.Timestamp(curr_date)
     monkeypatch.setattr(ohlcv.pd.Timestamp, "today", staticmethod(lambda: today))
+    # FORK(funds): ohlcv-interval
     cache_file = tmp_path / "AAPL-YFin-data-1d.csv"
     cache_file.write_text(frame.to_csv(index=False))
     _stamp(cache_file, today)
@@ -196,6 +197,7 @@ def test_the_snapshot_does_not_present_a_filled_price_as_reported(monkeypatch, t
     today = pd.Timestamp("2026-05-08 12:00")
     monkeypatch.setattr(ohlcv, "get_config", lambda: {"data_cache_dir": str(tmp_path)})
     monkeypatch.setattr(ohlcv.pd.Timestamp, "today", staticmethod(lambda: today))
+    # FORK(funds): ohlcv-interval
     cache = tmp_path / "AAPL-YFin-data-1d.csv"
     cache.write_text(frame.to_csv(index=False))
     _stamp(cache, today)

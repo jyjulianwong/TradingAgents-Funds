@@ -118,6 +118,7 @@ class TradingAgentsGraph:
         self._checkpointer_ctx = None
         self._resuming = False
 
+    # FORK(funds): fund
     def resolve_instrument_context(self, ticker: str, asset_type: str = "stock",
                                    trade_date: str | None = None) -> str:
         """Resolve ticker identity once and return the full instrument context.
@@ -134,6 +135,7 @@ class TradingAgentsGraph:
         treat proxy data in the analyst reports as representative of the fund.
         """
         identity = resolve_instrument_identity(ticker)
+        # FORK(funds): fund
         all_tickers = resolve_isin_ticker_list(ticker)
         mapped = all_tickers[1:] if len(all_tickers) > 1 else None
         return build_instrument_context(

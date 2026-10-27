@@ -129,7 +129,7 @@ def get_fund_analysis_instruction(ticker: str, state: Mapping[str, Any] | None =
     )
 
 
-# TODO: Hotfix #0001
+# FORK(funds): hotfix #0001
 def get_autonomous_agent_instruction() -> str:
     """Return a prompt instruction reminding tool-calling agents to proceed autonomously.
 
@@ -237,6 +237,7 @@ def _identity(ticker: str) -> dict:
     return identity
 
 
+# FORK(funds): fund
 def build_instrument_context(
     ticker: str,
     asset_type: str = "stock",
@@ -307,6 +308,7 @@ def build_instrument_context(
             "assume company fundamentals are available."
         )
 
+    # FORK(funds): fund
     if mapped_tickers:
         context += (
             f" This instrument is a fund identified by ISIN {ticker}. Because fund"

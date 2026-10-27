@@ -22,6 +22,7 @@ from tradingagents.dataflows.vendors.yahoo.ohlcv import load_ohlcv
 
 # Matches the standard 12-character ISIN format: 2-letter country code,
 # 9 alphanumeric characters, 1 numeric check digit.
+# FORK(funds): fund
 _ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
 # A fixed, common indicator set so the snapshot is the same shape every run.
@@ -68,6 +69,7 @@ def _fmt(value) -> str:
     return str(value)
 
 
+# FORK(funds): fund
 def build_verified_market_snapshot(
     symbol: str,
     as_of_date: str,

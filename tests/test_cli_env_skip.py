@@ -113,6 +113,7 @@ class TestResearchDepthSkippedFromEnv(unittest.TestCase):
         self.assertEqual(sel["research_depth"], 2)
 
 
+# FORK(funds): cli-presets
 @pytest.mark.unit
 class TestAnalysisDateSkippedFromEnv(unittest.TestCase):
     def test_analysis_date_env_skips_step2_prompt(self):

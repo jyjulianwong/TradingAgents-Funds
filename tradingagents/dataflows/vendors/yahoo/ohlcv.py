@@ -26,6 +26,7 @@ OHLCV_CACHE_TTL_SECONDS = 900
 # yfinance enforces hard history limits for intraday intervals. Keys are the
 # yfinance interval strings; values are the safe lookback in calendar days.
 # Intervals absent from this map (daily, weekly, monthly) use a 5-year window.
+# FORK(funds): ohlcv-interval
 _INTERVAL_LOOKBACK_DAYS: dict[str, int] = {
     "1m": 6,
     "2m": 59,
@@ -172,6 +173,7 @@ def _cache_is_fresh(data_file, as_of_dt, now) -> bool:
     return as_of_dt.date() < now.date() or (now - written).total_seconds() <= OHLCV_CACHE_TTL_SECONDS
 
 
+# FORK(funds): ohlcv-interval
 def load_ohlcv(
     symbol: str,
     as_of_date: str,
@@ -191,6 +193,7 @@ def load_ohlcv(
     continuous series. Pass ``False`` to read the values as the vendor reported
     them, leaving a cell that was never reported empty.
     """
+    # FORK(funds): ohlcv-interval
     if interval is None:
         interval = get_config().get("tool_vendors", {}).get("ohlcv_interval", "1d")
 
@@ -205,6 +208,7 @@ def load_ohlcv(
 
     # One cache file per symbol, holding the latest 5y-to-today download.
     now = pd.Timestamp.today()
+    # FORK(funds): ohlcv-interval
     lookback_days = _INTERVAL_LOOKBACK_DAYS.get(interval)
     if lookback_days is not None:
         start_date = now - pd.Timedelta(days=lookback_days)
@@ -220,6 +224,7 @@ def load_ohlcv(
     # One cache file per symbol+interval (not per date range, #1330) so a later
     # day's download replaces it instead of accumulating a file per day.
     # Include interval in the filename so different intervals don't share a cache.
+    # FORK(funds): ohlcv-interval
     data_file = os.path.join(
         config["data_cache_dir"],
         f"{safe_symbol}-YFin-data-{interval}.csv",
@@ -241,6 +246,7 @@ def load_ohlcv(
     if data is None:
         # yf.download catches every error, a rate limit included, and returns
         # an empty frame. Ticker.history raises the rate limit, so it is retried.
+        # FORK(funds): ohlcv-interval
         downloaded = yf_retry(
             lambda: yf.Ticker(canonical).history(
                 start=start_str,

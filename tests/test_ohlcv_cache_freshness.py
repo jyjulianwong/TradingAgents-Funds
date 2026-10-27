@@ -70,6 +70,7 @@ def test_a_download_from_an_earlier_day_is_not_fresh(tmp_path):
     assert ohlcv._cache_is_fresh(f, pd.Timestamp("2026-05-01"), NOW) is False
 
 
+# FORK(funds): ohlcv-interval
 @pytest.mark.unit
 def test_load_ohlcv_refetches_stale_same_day_cache(tmp_path, monkeypatch):
     """End-to-end: the freshness check is wired into load_ohlcv's cache branch.
@@ -95,6 +96,7 @@ def test_load_ohlcv_refetches_stale_same_day_cache(tmp_path, monkeypatch):
 
 @pytest.mark.unit
 def test_load_ohlcv_reuses_fresh_same_day_cache(tmp_path, monkeypatch):
+    # FORK(funds): ohlcv-interval
     _write(tmp_path, name="AAPL-YFin-data-1d.csv", last_date="2026-07-18")
     _load(tmp_path, monkeypatch, "2026-07-18", _fail_download)
 
@@ -116,4 +118,5 @@ def test_one_cache_file_per_symbol_across_days(tmp_path, monkeypatch):
         _stamp(written[0], now)
 
     assert len(downloads) == 3, "each new day refetches"
+    # FORK(funds): ohlcv-interval
     assert [p.name for p in tmp_path.iterdir()] == ["AAPL-YFin-data-1d.csv"]

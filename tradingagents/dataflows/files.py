@@ -70,6 +70,7 @@ def _hold_windows(handle, wait: bool = True) -> Iterator[bool]:
 
     handle.seek(0)
     while True:
+        # FORK(funds): windows-lock-fix
         try:
             msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK if wait else msvcrt.LK_NBLCK, 1)
             break

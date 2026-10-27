@@ -49,6 +49,7 @@ def test_the_price_cache_is_replaced_whole(monkeypatch, tmp_path):
 
     ohlcv.load_ohlcv("AAPL", "2026-01-06")
 
+    # FORK(funds): ohlcv-interval
     assert [dst.name for _, dst in moves] == ["AAPL-YFin-data-1d.csv"]
     assert moves[0][0].parent == tmp_path and moves[0][0] != moves[0][1]
     assert not list(tmp_path.glob("*.tmp*"))
@@ -106,6 +107,7 @@ def test_on_windows_the_lock_is_waited_for_while_another_writer_holds_it(tmp_pat
     import errno
     import sys
 
+    # FORK(funds): windows-lock-fix
     deadlock_errno = getattr(errno, "EDEADLOCK", errno.EDEADLK)
     fake, calls = _fake_msvcrt([OSError(deadlock_errno, "held"), None])
     monkeypatch.setitem(sys.modules, "msvcrt", fake)

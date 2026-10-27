@@ -42,6 +42,7 @@ class RiskDebateState(TypedDict):
     count: Annotated[int, "Length of the current conversation"]
 
 
+# FORK(funds): fund
 class AgentState(MessagesState):
     company_of_interest: Annotated[str, "Company that we are interested in trading"]
     asset_type: Annotated[str, "Asset type under analysis such as stock or crypto"]

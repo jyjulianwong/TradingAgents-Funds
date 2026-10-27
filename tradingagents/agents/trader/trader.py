@@ -44,6 +44,7 @@ def create_trader(llm):
             grounding = ""
             report_section = ""
 
+        # FORK(funds): fund
         messages = [
             {
                 "role": "system",

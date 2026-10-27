@@ -293,6 +293,7 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
 # ---------------------------------------------------------------------------
 
 
+# FORK(funds): fund
 class FundHoldingsAnalysis(BaseModel):
     """Structured proxy-ticker selection produced by the Fund Analyst.
 

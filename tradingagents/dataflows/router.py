@@ -47,6 +47,7 @@ from tradingagents.dataflows.vendors.yahoo.news import get_global_news_yfinance,
 logger = logging.getLogger(__name__)
 
 # Tools organized by category
+# FORK(funds): fund
 TOOLS_CATEGORIES = {
     "core_stock_apis": {
         "description": "OHLCV stock price data",
@@ -118,6 +119,7 @@ TOOLS_CATEGORIES = {
 # rate-limited, network error) without that ever blocking a run — see
 # fund_analyst.py's _verify_ticker, which treats an unreachable vendor as "no
 # verdict" rather than a failure.
+# FORK(funds): fund
 OPTIONAL_CATEGORIES = {
     "macro_data",
     "prediction_markets",
@@ -126,6 +128,7 @@ OPTIONAL_CATEGORIES = {
 }
 
 # Mapping of methods to their vendor-specific implementations
+# FORK(funds): fund
 VENDOR_METHODS = {
     # core_stock_apis
     "get_stock_data": {

@@ -104,6 +104,7 @@ _SEARCH_LOOKBACK = timedelta(days=7)  # matches t=week below
 
 
 def _search_qs(ticker: str, limit: int) -> str:
+    # FORK(funds): reddit-feed-token
     params: dict = {
         "q": ticker,
         "restrict_sr": "on",

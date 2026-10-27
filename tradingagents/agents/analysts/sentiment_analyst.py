@@ -45,9 +45,11 @@ from tradingagents.dataflows.vendors.reddit import (
 )
 from tradingagents.dataflows.vendors.stocktwits import fetch_stocktwits_messages
 
+# FORK(funds): fund
 logger = logging.getLogger(__name__)
 
 
+# FORK(funds): fund
 def _fetch_multi_ticker_blocks(
     isin: str,
     mapped_tickers: list[str],
@@ -110,9 +112,11 @@ def create_sentiment_analyst(llm):
     """
     structured_llm = bind_structured(llm, SentimentReport, "Sentiment Analyst")
 
+    # FORK(funds): fund
     def sentiment_analyst_node(state):
         ticker = state["company_of_interest"]
         end_date = state["trade_date"]
+        # FORK(funds): sentiment-window
         start_date = _thirty_days_back(end_date)
         instrument_context = get_instrument_context_from_state(state)
 
@@ -128,6 +132,7 @@ def create_sentiment_analyst(llm):
         # Pre-fetch all three sources. Each fetcher degrades gracefully and
         # returns a string (no exceptions surface from here), so the LLM
         # always sees something — either real data or a clear placeholder.
+        # FORK(funds): fund
         if is_mapped:
             news_block, stocktwits_block, reddit_block = _fetch_multi_ticker_blocks(
                 isin=ticker,
@@ -149,6 +154,7 @@ def create_sentiment_analyst(llm):
                 ticker, subreddits, start_date=start_date, end_date=end_date, screen=screen
             )
 
+        # FORK(funds): fund
         system_message = _build_system_message(
             ticker=ticker,
             start_date=start_date,
@@ -202,6 +208,7 @@ def create_sentiment_analyst(llm):
     return sentiment_analyst_node
 
 
+# FORK(funds): fund
 def _build_system_message(
     *,
     ticker: str,
@@ -241,6 +248,7 @@ def _build_system_message(
         character = f"r/{subreddits[0]} leans toward the coin's holders; r/CryptoCurrency and r/CryptoMarkets are broader"
     else:
         character = "r/CryptoCurrency and r/CryptoMarkets are broad crypto communities"
+    # FORK(funds): fund
     return f"""You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {subject_description} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
 
 ## Data sources (pre-fetched, in this prompt)
@@ -293,4 +301,4 @@ Fill the following fields:
 - **confidence**: low / medium / high, based on data quality and sample size.
 - **narrative**: Full source-by-source breakdown, divergences, dominant narrative themes, catalysts and risks, and a markdown summary table of key sentiment signals (direction, source, supporting evidence).
 
-{get_autonomous_agent_instruction()}{get_language_instruction()}"""  # TODO: Hotfix #0001
+{get_autonomous_agent_instruction()}{get_language_instruction()}"""  # FORK(funds): hotfix #0001

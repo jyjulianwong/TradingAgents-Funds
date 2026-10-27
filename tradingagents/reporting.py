@@ -47,6 +47,7 @@ def _header(ticker: str, final_state: dict, settings: dict | None) -> str:
 
 
 # The report's sections in order: (heading, folder, [(agent, file, state path)]).
+# FORK(funds): fund
 _SECTIONS = (
     ("I. Analyst Team Reports", "1_analysts", (
         ("Fund Analyst", "fund.md", ("fund_report",)),
@@ -109,6 +110,7 @@ def write_report_tree(final_state: dict, ticker: str, save_path, settings: dict 
         content = "\n\n".join(f"### {agent}\n{text}" for agent, _filename, text in written)
         sections.append(f"## {heading}\n\n{content}")
 
+    # FORK(funds): fund
     (save_path / "complete_report.md").write_text(
         _header(ticker, final_state, settings) + _proxy_banner(final_state, ticker) + "\n\n".join(sections),
         encoding="utf-8",
@@ -122,6 +124,7 @@ def write_report_tree(final_state: dict, ticker: str, save_path, settings: dict 
     return save_path / "complete_report.md"
 
 
+# FORK(funds): fund
 def _proxy_banner(final_state: dict, ticker: str) -> str:
     """Render a top-of-report callout naming the instruments actually analyzed.
 

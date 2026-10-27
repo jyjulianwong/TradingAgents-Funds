@@ -16,6 +16,7 @@ from tradingagents.dataflows.router import no_data_available, route_to_vendor, v
 from tradingagents.dataflows.vendors.yahoo.snapshot import build_verified_market_snapshot
 
 
+# FORK(funds): ohlcv-interval
 @tool
 def get_stock_data(
     symbol: Annotated[str, InjectedState("company_of_interest")],
@@ -39,6 +40,7 @@ def get_stock_data(
     Returns:
         str: A formatted dataframe containing the price data for the instrument over the date range.
     """
+    # FORK(funds): ohlcv-interval
     if interval is None:
         from tradingagents.dataflows.config import get_config
 
@@ -47,6 +49,7 @@ def get_stock_data(
         start_date, end_date = as_of_window(start_date, end_date, trade_date)
     except ValueError as e:
         return str(e)
+    # FORK(funds): ohlcv-interval
     return route_to_vendor("get_stock_data", symbol, start_date, end_date, interval)
 
 
@@ -74,6 +77,7 @@ def get_indicators(
     indicators = [i.strip().lower() for i in indicator.split(",") if i.strip()]
     results = []
     for ind in indicators:
+        # FORK(funds): fund
         if ind == "atr" and is_isin(symbol.strip().upper()):
             results.append(f"ATR not applicable — OEIC O/H/L data is not published for {symbol}.")
             continue

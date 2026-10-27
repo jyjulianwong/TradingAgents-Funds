@@ -11,6 +11,7 @@ from tradingagents.agents.markdown import ensure_blank_line_before_tables
 
 def create_neutral_debator(llm):
     def neutral_node(state) -> dict:
+        # FORK(funds): fund
         ticker = state["company_of_interest"]
         risk_debate_state = state["risk_debate_state"]
         history = risk_debate_state.get("history", "")
@@ -32,6 +33,7 @@ def create_neutral_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
+        # FORK(funds): fund
         prompt = (
             f"""As the Neutral Risk Analyst, your role is to provide a balanced perspective, weighing both the potential benefits and risks of the trader's decision or plan. You prioritize a well-rounded approach, evaluating the upsides and downsides while factoring in broader market trends, potential economic shifts, and diversification strategies.Here is the trader's decision:
 
@@ -54,6 +56,7 @@ Engage actively by analyzing both sides critically, addressing weaknesses in the
 
         response = llm.invoke(prompt)
 
+        # FORK(funds): markdown-tables
         argument = f"Neutral Analyst: {ensure_blank_line_before_tables(response.content)}"
 
         new_risk_debate_state = {

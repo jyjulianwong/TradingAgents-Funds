@@ -1,3 +1,4 @@
+<!-- FORK(funds): everything above the "original TradingAgents README" divider is fork-only -->
 # TradingAgents for Investment Funds — Python Library Extension
 
 > This is a fork of [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) extended to support OEIC / mutual fund analysis via proxy holdings.

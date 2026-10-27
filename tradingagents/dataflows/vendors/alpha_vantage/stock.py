@@ -9,6 +9,7 @@ from tradingagents.dataflows.vendors.alpha_vantage.common import (
 # Intraday intervals are not supported: Alpha Vantage's TIME_SERIES_INTRADAY
 # uses a different parameter set and response format that would require a
 # separate implementation. Use yfinance for intraday data.
+# FORK(funds): ohlcv-interval
 _AV_ENDPOINT_MAP = {
     "1d": "TIME_SERIES_DAILY_ADJUSTED",
     "1wk": "TIME_SERIES_WEEKLY_ADJUSTED",
@@ -16,6 +17,7 @@ _AV_ENDPOINT_MAP = {
 }
 
 
+# FORK(funds): ohlcv-interval
 def get_stock(
     symbol: str,
     start_date: str,
@@ -35,6 +37,7 @@ def get_stock(
     Returns:
         CSV string containing the time series data filtered to the date range.
     """
+    # FORK(funds): ohlcv-interval
     endpoint = _AV_ENDPOINT_MAP.get(interval)
     if endpoint is None:
         supported = list(_AV_ENDPOINT_MAP)

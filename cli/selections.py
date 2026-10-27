@@ -114,6 +114,7 @@ def _from_flag(parse, value, *args):
         raise typer.Exit(code=1) from None
 
 
+# FORK(funds): cli-presets
 def _prompt_selections(prefs, flags):
     """Walk the selection steps. ``prefs`` prefills; flags and the environment skip."""
     with open(Path(__file__).parent / "static" / "welcome.txt", encoding="utf-8") as f:
@@ -221,6 +222,7 @@ def _prompt_selections(prefs, flags):
 
     # Step 4: Select analysts (skipped when set via TRADINGAGENTS_ANALYSTS or --analysts)
     prefs = sanitize(prefs, asset_type.value)
+    # FORK(funds): cli-presets
     if DEFAULT_CONFIG.get("analysts"):
         raw_analysts = DEFAULT_CONFIG["analysts"]
         valid_values = {a.value for a in AnalystType}
@@ -242,6 +244,7 @@ def _prompt_selections(prefs, flags):
         )
     elif flags.get("analysts") is not None:
         selected_analysts = _from_flag(parse_analysts, flags["analysts"], asset_type)
+        # FORK(funds): cli-presets
         console.print(
             f"[green]✓ Analysts from --analysts:[/green] "
             f"{', '.join(a.value for a in selected_analysts)}"
@@ -253,6 +256,7 @@ def _prompt_selections(prefs, flags):
             )
         )
         selected_analysts = select_analysts(asset_type, prefs.get("analysts"))
+        # FORK(funds): cli-presets
         console.print(
             f"[green]Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
         )

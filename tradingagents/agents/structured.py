@@ -93,5 +93,6 @@ def invoke_structured_or_freetext(
     """Run the structured call and render to markdown; fall back to free-text on any failure."""
     result = invoke_structured(structured_llm, prompt, agent_name)
     if result is not None:
+        # FORK(funds): markdown-tables
         return ensure_blank_line_before_tables(render(result))
     return ensure_blank_line_before_tables(plain_llm.invoke(prompt).content)
