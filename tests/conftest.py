@@ -117,6 +117,22 @@ def _dummy_api_keys(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_visualizer(monkeypatch):
+    """Tests do not start the real 3-D visualizer server.
+
+    cli.run_analysis() starts a real FastAPI/uvicorn server and writes real
+    JSONL event logs under ~/.tradingagents/visualizer_events/ whenever
+    enable_visualizer is left at its default (True) — _no_network above does
+    not block this, since binding/listening on a local port is not an outbound
+    connection. A test that wants to exercise the real visualizer wiring can
+    set enable_visualizer back to True itself.
+    """
+    import tradingagents.default_config as default_config
+
+    monkeypatch.setitem(default_config.DEFAULT_CONFIG, "enable_visualizer", False)
+
+
+@pytest.fixture(autouse=True)
 def _isolate_config():
     """Reset the global dataflows config before and after each test.
 
