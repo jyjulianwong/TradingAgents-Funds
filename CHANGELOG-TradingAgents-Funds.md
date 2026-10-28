@@ -7,6 +7,8 @@ See `FORK.md` for how to find fork edits (`grep -rn "FORK(funds)"`).
 
 - Fixed: since upstream pinned its data tools to the run's instrument (v0.5.x), a fund run's Market, News and Fundamentals analysts got the ISIN's own data for every proxy request, so no proxy prices, indicators, fundamentals or news were ever used. Added `agents/fund_tools.py`: twins of upstream's tools with an optional `symbol` (the ISIN or its resolved proxies only) that delegate to upstream's own tool functions, so upstream vendor and tool fixes carry through. Ordinary tickers still get upstream's tools and schemas.
 
+- Added `fund_logging.py`: silences yfinance's per-call pandas `inplace` deprecation warnings (hundreds per run). Scoped to yfinance's own modules; set `TRADINGAGENTS_SHOW_LIBRARY_WARNINGS=1` to see them.
+
 ## Merge of upstream v0.7.1
 
 - Merged upstream v0.7.1. Upstream fixed the Windows/macOS lock-error handling itself, so the fork's `windows-lock-fix` edit was dropped. Moved the proxy-instruments report banner into `fund_report.py`.
