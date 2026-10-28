@@ -6,8 +6,10 @@ from tradingagents.agents.context import (
     get_fund_analysis_instruction,
     get_instrument_context_from_state,
     get_language_instruction,
+    get_symbol_argument_instruction,
     resolve_isin_ticker_list,
 )
+from tradingagents.agents.fund_tools import tools_for_run
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 from tradingagents.agents.tools import get_indicators, get_stock_data, get_verified_market_snapshot
 
@@ -90,6 +92,7 @@ Before writing the final report, call get_verified_market_snapshot for this tick
 Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
             + isin_note
             + fund_note
+            + get_symbol_argument_instruction(ticker, state)  # FORK(funds): fund
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " When calling get_stock_data, default to the '1d' interval unless the data clearly warrants a different granularity."  # FORK(funds): hotfix #0001
             + get_autonomous_agent_instruction()  # FORK(funds): hotfix #0001
@@ -118,7 +121,8 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(instrument_context=instrument_context)
 
-        result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        # FORK(funds): fund
+        result, report = take_turn(prompt, llm, tools_for_run(TOOLS, state), state["messages"])
         # FORK(funds): markdown-tables
         if report:
             report = ensure_blank_line_before_tables(report)

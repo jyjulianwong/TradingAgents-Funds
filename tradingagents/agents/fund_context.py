@@ -161,3 +161,19 @@ def fund_instrument_note(ticker: str, mapped_tickers: list[str] | None) -> str:
         f" proxy. Treat data from these proxy tickers as representative of the"
         f" fund's performance and characteristics."
     )
+
+
+def get_symbol_argument_instruction(ticker: str, state: Mapping[str, Any] | None = None) -> str:
+    """Prompt sentence telling a fund run's analyst how to pick a symbol in the data tools.
+
+    Empty for an ordinary ticker, or a fund with no resolved proxies, so it is safe to
+    append to any analyst prompt. See ``fund_tools.py`` for the tools it refers to.
+    """
+    symbols = resolve_isin_ticker_list(ticker, state) if is_isin(ticker) else []
+    if len(symbols) < 2:
+        return ""
+    return (
+        " Every per-instrument data tool takes an optional `symbol` argument: pass one of"
+        f" {', '.join(f'`{s}`' for s in symbols)} to get that symbol's data, and omit it for"
+        f" the fund `{ticker}` itself. Any other symbol is refused."
+    )

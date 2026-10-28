@@ -36,3 +36,14 @@ Fork behaviour is kept in fork-only modules; the upstream files carry only tagge
 | `default_config.py` | `fund_config.py` (env overrides, fund vendors, `isin_ticker_map`, CLI presets, OHLCV interval) | four `**FUND_*` merges |
 | `dataflows/router.py` | `dataflows/fund_vendors.py` (fund fact-sheet and symbol-search routing) | three table merges |
 | `reporting.py` | `fund_report.py` (`proxy_banner`) | one import, the Fund Analyst section row, one call |
+| `agents/tools.py` (per-instrument tools) | `agents/fund_tools.py` (symbol-selectable twins) | `ToolNode(tool_node_tools(...))` in `graph/setup.py`; `tools_for_run(...)` and a prompt sentence in the market, news and fundamentals analysts |
+
+### Keeping the fund tools in step with upstream
+
+Upstream pins every per-instrument tool to the run's instrument, so a fund run could never fetch a
+proxy ticker's data. `fund_tools.with_symbol` builds a twin of each such tool by reading its signature,
+adds an optional `symbol` argument (a fund run's ISIN or resolved proxies only), and calls upstream's own
+function (`tool.func`). So vendor and router fixes, and fixes inside a tool body, reach fund runs with no
+edit here, and a new argument added upstream to a tool appears on its twin automatically.
+`tests/test_fund_tools.py` fails if upstream changes how a tool declares its injected symbol or state
+in a way the twin can't follow.
