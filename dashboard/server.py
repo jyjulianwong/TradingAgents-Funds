@@ -18,7 +18,10 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = Path(os.environ.get("TRADINGAGENTS_DIR", Path.home() / ".tradingagents")).resolve()
 LOGS_DIR = BASE_DIR / "logs"
 EVENTS_DIR = BASE_DIR / "visualizer_events"
-REPORTS_DIR = Path(__file__).parent.parent / "reports"
+# Where TradingAgentsGraph.default_report_path() / save_reports() writes a
+# run's consolidated report tree (results_dir/reports/{ticker}_{stamp}/),
+# not a path relative to this repo checkout.
+REPORTS_DIR = LOGS_DIR / "reports"
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="TradingAgents Dashboard", docs_url=None, redoc_url=None)
@@ -43,7 +46,13 @@ def _safe_path(base: Path, *parts: str) -> Path:
 def _parse_report_folder(name: str) -> tuple[str, str, str] | None:
     """Parse {ticker}_{YYYYMMDD}_{HHMMSS} into (ticker, formatted_date, formatted_time)."""
     parts = name.rsplit("_", 2)
-    if len(parts) == 3 and parts[1].isdigit() and len(parts[1]) == 8 and parts[2].isdigit() and len(parts[2]) == 6:
+    if (
+        len(parts) == 3
+        and parts[1].isdigit()
+        and len(parts[1]) == 8
+        and parts[2].isdigit()
+        and len(parts[2]) == 6
+    ):
         ticker, d, t = parts
         return ticker, f"{d[:4]}-{d[4:6]}-{d[6:8]}", f"{t[:2]}:{t[2:4]}:{t[4:6]}"
     return None
@@ -94,7 +103,7 @@ async def list_reports() -> dict:
         return {}
     result: dict = {}
     for ticker_dir in sorted(LOGS_DIR.iterdir()):
-        if not ticker_dir.is_dir():
+        if not ticker_dir.is_dir() or ticker_dir == REPORTS_DIR:
             continue
         runs = []
         for date_dir in sorted(ticker_dir.iterdir(), reverse=True):
@@ -129,9 +138,7 @@ async def get_run(ticker: str, date: str) -> dict:
 
 
 @app.get("/api/reports/{ticker}/{date}/content")
-async def get_file_content(
-    ticker: str, date: str, path: str = Query(...)
-) -> PlainTextResponse:
+async def get_file_content(ticker: str, date: str, path: str = Query(...)) -> PlainTextResponse:
     run_dir = _safe_path(LOGS_DIR, ticker, date)
     file_path = _safe_path(run_dir, path)
     if not file_path.is_file():
@@ -152,9 +159,7 @@ async def delete_run(ticker: str, date: str) -> dict:
 
 
 @app.delete("/api/reports/{ticker}/{date}/file")
-async def delete_file(
-    ticker: str, date: str, path: str = Query(...)
-) -> dict:
+async def delete_file(ticker: str, date: str, path: str = Query(...)) -> dict:
     run_dir = _safe_path(LOGS_DIR, ticker, date)
     file_path = _safe_path(run_dir, path)
     if not file_path.is_file():
@@ -210,9 +215,7 @@ async def get_final_report(folder: str) -> dict:
 
 
 @app.get("/api/finalreports/{folder}/content")
-async def get_final_report_content(
-    folder: str, path: str = Query(...)
-) -> PlainTextResponse:
+async def get_final_report_content(folder: str, path: str = Query(...)) -> PlainTextResponse:
     folder_path = _safe_path(REPORTS_DIR, folder)
     file_path = _safe_path(folder_path, path)
     if not file_path.is_file():
@@ -284,12 +287,14 @@ async def get_stats() -> dict:
     tickers = runs = 0
     if LOGS_DIR.exists():
         for td in LOGS_DIR.iterdir():
-            if td.is_dir():
+            if td.is_dir() and td != REPORTS_DIR:
                 tickers += 1
                 runs += sum(1 for dd in td.iterdir() if dd.is_dir())
     event_logs = len(list(EVENTS_DIR.glob("*.jsonl"))) if EVENTS_DIR.exists() else 0
     reports = (
-        sum(1 for item in REPORTS_DIR.iterdir() if item.is_dir() and _parse_report_folder(item.name))
+        sum(
+            1 for item in REPORTS_DIR.iterdir() if item.is_dir() and _parse_report_folder(item.name)
+        )
         if REPORTS_DIR.exists()
         else 0
     )
