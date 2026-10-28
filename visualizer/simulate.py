@@ -32,44 +32,81 @@ import webbrowser
 
 _NO_COLOR = not sys.stdout.isatty()
 
+
 def _c(code, text):
     return text if _NO_COLOR else f"\033[{code}m{text}\033[0m"
 
-def dim(t):    return _c("2",  t)
-def bold(t):   return _c("1",  t)
-def green(t):  return _c("92", t)
-def red(t):    return _c("91", t)
-def yellow(t): return _c("93", t)
-def cyan(t):   return _c("96", t)
+
+def dim(t):
+    return _c("2", t)
+
+
+def bold(t):
+    return _c("1", t)
+
+
+def green(t):
+    return _c("92", t)
+
+
+def red(t):
+    return _c("91", t)
+
+
+def yellow(t):
+    return _c("93", t)
+
+
+def cyan(t):
+    return _c("96", t)
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Simulate a TradingAgents run for the Visualizer (no LLM calls).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--ticker",        default="NVDA",  metavar="SYMBOL",
-                        help="Ticker symbol shown on the LED board (default: NVDA)")
-    parser.add_argument("--date",          default=None,    metavar="YYYY-MM-DD",
-                        help="Analysis date (default: today)")
-    parser.add_argument("--signal",        default="BUY",
-                        choices=["BUY", "HOLD", "SELL"],
-                        help="Final rating to display when complete (default: BUY)")
-    parser.add_argument("--speed",         default=1.0,     type=float, metavar="N",
-                        help="Playback speed multiplier — 2 = twice as fast (default: 1.0)")
-    parser.add_argument("--fast",          action="store_true",
-                        help="Shortcut for --speed 4")
-    parser.add_argument("--debate-rounds", default=2,       type=int,   metavar="N",
-                        help="Number of Bull/Bear and risk debate rounds (default: 2)")
-    parser.add_argument("--port",          default=7842,    type=int,
-                        help="Port for the visualizer server (default: 7842)")
+    parser.add_argument(
+        "--ticker",
+        default="NVDA",
+        metavar="SYMBOL",
+        help="Ticker symbol shown on the LED board (default: NVDA)",
+    )
+    parser.add_argument(
+        "--date", default=None, metavar="YYYY-MM-DD", help="Analysis date (default: today)"
+    )
+    parser.add_argument(
+        "--signal",
+        default="BUY",
+        choices=["BUY", "HOLD", "SELL"],
+        help="Final rating to display when complete (default: BUY)",
+    )
+    parser.add_argument(
+        "--speed",
+        default=1.0,
+        type=float,
+        metavar="N",
+        help="Playback speed multiplier — 2 = twice as fast (default: 1.0)",
+    )
+    parser.add_argument("--fast", action="store_true", help="Shortcut for --speed 4")
+    parser.add_argument(
+        "--debate-rounds",
+        default=2,
+        type=int,
+        metavar="N",
+        help="Number of Bull/Bear and risk debate rounds (default: 2)",
+    )
+    parser.add_argument(
+        "--port", default=7842, type=int, help="Port for the visualizer server (default: 7842)"
+    )
     args = parser.parse_args()
 
-    speed  = args.speed * (4.0 if args.fast else 1.0)
+    speed = args.speed * (4.0 if args.fast else 1.0)
     ticker = args.ticker.upper()
-    date   = args.date or datetime.date.today().strftime("%Y-%m-%d")
+    date = args.date or datetime.date.today().strftime("%Y-%m-%d")
     signal = args.signal.upper()
     rounds = max(1, args.debate_rounds)
 
@@ -77,14 +114,16 @@ def main() -> None:
     from visualizer import bridge, server as viz_server  # noqa: PLC0415
 
     port = viz_server.start(port=args.port)
-    url  = f"http://127.0.0.1:{port}"
+    url = f"http://127.0.0.1:{port}"
 
     print()
     print(bold("  TradingAgents Visualizer — Simulation"))
     print(dim("  ──────────────────────────────────────"))
     print(f"  {dim('URL   :')} {cyan(url)}")
-    print(f"  {dim('Ticker:')} {bold(ticker)}   {dim('Date:')} {date}   "
-          f"{dim('Signal:')} {bold(signal)}   {dim('Speed:')} {speed:.1f}×")
+    print(
+        f"  {dim('Ticker:')} {bold(ticker)}   {dim('Date:')} {date}   "
+        f"{dim('Signal:')} {bold(signal)}   {dim('Speed:')} {speed:.1f}×"
+    )
     print(f"  {dim('Debate rounds:')} {rounds}")
     print()
 
@@ -124,58 +163,102 @@ def main() -> None:
     bridge.emit({"type": "workflow_start", "ticker": ticker, "date": date})
     wait(1.2)
 
+    # ── Fund Analyst (gate node, runs before the analysts) ─────────────────────
+    # FORK(funds): a no-op for an ordinary ticker like this one; for a fund ISIN
+    # it resolves exchange-traded proxy tickers before any analyst runs.
+    print(f"\n  {dim('── Fund Analyst')} {'─' * 35}")
+    activate("Fund Analyst")
+    wait(0.8, f"Checking whether {ticker} is a fund ISIN…")
+    message("Fund Analyst", f"{ticker} is not a fund ISIN — no proxy-ticker resolution needed.")
+    wait(0.6)
+
     # ── Analyst team ──────────────────────────────────────────────────────────
-    print(f"\n  {dim('── Analyst Team')} {'─'*35}")
+    print(f"\n  {dim('── Analyst Team')} {'─' * 35}")
     analyst_specs = [
         (
-            "Market Analyst", 5.5, "Fetching OHLCV, computing RSI/MACD/BB…",
+            "Market Analyst",
+            5.5,
+            "Fetching OHLCV, computing RSI/MACD/BB…",
             [
-                (1.2, f"Fetching 365 days of OHLCV data for {ticker}…\nRetrieved daily bars from Yahoo Finance."),
-                (2.5, "RSI(14): 67.3 — approaching overbought territory\n"
-                      "MACD: 2.45 > signal 1.87, bullish crossover confirmed\n"
-                      "Bollinger Bands: price at upper band (+1.9σ)\n"
-                      "Volume: +34% above 20-day average on breakout session"),
-                (4.2, f"Technical summary for {ticker}: Momentum indicators are bullish "
-                      f"with RSI trending upward but not yet in overbought territory. "
-                      f"MACD crossover suggests continuation of the current uptrend. "
-                      f"Support level identified at the 50-day SMA ($421.80)."),
+                (
+                    1.2,
+                    f"Fetching 365 days of OHLCV data for {ticker}…\nRetrieved daily bars from Yahoo Finance.",
+                ),
+                (
+                    2.5,
+                    "RSI(14): 67.3 — approaching overbought territory\n"
+                    "MACD: 2.45 > signal 1.87, bullish crossover confirmed\n"
+                    "Bollinger Bands: price at upper band (+1.9σ)\n"
+                    "Volume: +34% above 20-day average on breakout session",
+                ),
+                (
+                    4.2,
+                    f"Technical summary for {ticker}: Momentum indicators are bullish "
+                    f"with RSI trending upward but not yet in overbought territory. "
+                    f"MACD crossover suggests continuation of the current uptrend. "
+                    f"Support level identified at the 50-day SMA ($421.80).",
+                ),
             ],
         ),
         (
-            "Sentiment Analyst", 4.5, "Reading Reddit & StockTwits posts…",
+            "Sentiment Analyst",
+            4.5,
+            "Reading Reddit & StockTwits posts…",
             [
-                (1.0, f"Fetching recent posts from r/wallstreetbets, r/stocks, r/investing…\n"
-                      f"Scanning StockTwits feed for ${ticker} mentions…"),
-                (2.8, f"Social sentiment analysis ({ticker}):\n"
-                      f"  Reddit — 847 mentions (↑ 23% vs. prior week), sentiment: 68% bullish\n"
-                      f"  StockTwits — 312 posts, Bull/Bear ratio: 2.4:1\n"
-                      f"  Key themes: AI chip demand, data centre buildout, earnings beat"),
+                (
+                    1.0,
+                    f"Fetching recent posts from r/wallstreetbets, r/stocks, r/investing…\n"
+                    f"Scanning StockTwits feed for ${ticker} mentions…",
+                ),
+                (
+                    2.8,
+                    f"Social sentiment analysis ({ticker}):\n"
+                    f"  Reddit — 847 mentions (↑ 23% vs. prior week), sentiment: 68% bullish\n"
+                    f"  StockTwits — 312 posts, Bull/Bear ratio: 2.4:1\n"
+                    f"  Key themes: AI chip demand, data centre buildout, earnings beat",
+                ),
             ],
         ),
         (
-            "News Analyst", 5.0, "Scanning news, FRED macro, Polymarket…",
+            "News Analyst",
+            5.0,
+            "Scanning news, FRED macro, Polymarket…",
             [
-                (1.3, f"Scanning news headlines for {ticker} (last 7 days)…\n"
-                      f"Fetching FRED macro indicators: Fed Funds Rate, CPI, GDP…\n"
-                      f"Querying Polymarket for relevant prediction markets…"),
-                (3.5, "Key news events:\n"
-                      "  • Earnings beat: EPS $5.16 vs. $4.59 consensus (+12.4%)\n"
-                      "  • New data-centre partnership announced with major hyperscaler\n"
-                      "  • Morgan Stanley raises PT to $950; reiterates Overweight\n\n"
-                      "Macro context: Fed held rates steady; CPI softening to 3.1% YoY. "
-                      "Risk-on environment supportive of growth equities."),
+                (
+                    1.3,
+                    f"Scanning news headlines for {ticker} (last 7 days)…\n"
+                    f"Fetching FRED macro indicators: Fed Funds Rate, CPI, GDP…\n"
+                    f"Querying Polymarket for relevant prediction markets…",
+                ),
+                (
+                    3.5,
+                    "Key news events:\n"
+                    "  • Earnings beat: EPS $5.16 vs. $4.59 consensus (+12.4%)\n"
+                    "  • New data-centre partnership announced with major hyperscaler\n"
+                    "  • Morgan Stanley raises PT to $950; reiterates Overweight\n\n"
+                    "Macro context: Fed held rates steady; CPI softening to 3.1% YoY. "
+                    "Risk-on environment supportive of growth equities.",
+                ),
             ],
         ),
         (
-            "Fundamentals Analyst", 5.5, "Pulling income statement, balance sheet…",
+            "Fundamentals Analyst",
+            5.5,
+            "Pulling income statement, balance sheet…",
             [
-                (1.5, f"Fetching financial statements for {ticker}…\n"
-                      f"Income statement, balance sheet, cash flow (TTM + 4 quarters)"),
-                (3.8, f"Fundamental snapshot ({ticker}):\n"
-                      f"  Revenue: $44.1B TTM (+122% YoY)   Gross margin: 74.3%\n"
-                      f"  Operating income: $18.6B           P/E (fwd): 35.2×\n"
-                      f"  Free cash flow: $14.9B             Net debt: −$8.1B (net cash)\n"
-                      f"  ROIC: 47.8%  —  exceptional capital efficiency"),
+                (
+                    1.5,
+                    f"Fetching financial statements for {ticker}…\n"
+                    f"Income statement, balance sheet, cash flow (TTM + 4 quarters)",
+                ),
+                (
+                    3.8,
+                    f"Fundamental snapshot ({ticker}):\n"
+                    f"  Revenue: $44.1B TTM (+122% YoY)   Gross margin: 74.3%\n"
+                    f"  Operating income: $18.6B           P/E (fwd): 35.2×\n"
+                    f"  Free cash flow: $14.9B             Net debt: −$8.1B (net cash)\n"
+                    f"  ROIC: 47.8%  —  exceptional capital efficiency",
+                ),
             ],
         ),
     ]
@@ -189,68 +272,88 @@ def main() -> None:
         wait(dur - elapsed)
 
     # ── Research debate ────────────────────────────────────────────────────────
-    print(f"\n  {dim('── Research Debate')} ({rounds} round{'s' if rounds > 1 else ''}) {'─'*26}")
+    print(f"\n  {dim('── Research Debate')} ({rounds} round{'s' if rounds > 1 else ''}) {'─' * 26}")
     for rnd in range(1, rounds + 1):
         print(dim(f"    Round {rnd}:"))
         activate("Bull Researcher")
         wait(1.2, "Constructing bull case from analyst reports…")
-        message("Bull Researcher",
-                f"[Round {rnd}] Bull case for {ticker}:\n"
-                f"The technical breakout above the 52-week high, combined with a 122% "
-                f"YoY revenue surge and strong free-cash-flow generation, makes a "
-                f"compelling upside argument. Insider ownership is high, and the "
-                f"forward P/E of 35× is justified by the AI infrastructure supercycle.")
+        message(
+            "Bull Researcher",
+            f"[Round {rnd}] Bull case for {ticker}:\n"
+            f"The technical breakout above the 52-week high, combined with a 122% "
+            f"YoY revenue surge and strong free-cash-flow generation, makes a "
+            f"compelling upside argument. Insider ownership is high, and the "
+            f"forward P/E of 35× is justified by the AI infrastructure supercycle.",
+        )
         wait(1.6)
         activate("Bear Researcher")
         wait(1.2, "Countering with bear thesis…")
-        message("Bear Researcher",
-                f"[Round {rnd}] Bear case for {ticker}:\n"
-                f"Valuation at 35× forward earnings prices in near-perfection. "
-                f"Export restrictions on advanced chips to China could dent 20–25% of "
-                f"revenues. RSI approaching overbought at 67 suggests near-term "
-                f"consolidation risk. Capex cycle pull-forward may compress margins.")
+        message(
+            "Bear Researcher",
+            f"[Round {rnd}] Bear case for {ticker}:\n"
+            f"Valuation at 35× forward earnings prices in near-perfection. "
+            f"Export restrictions on advanced chips to China could dent 20–25% of "
+            f"revenues. RSI approaching overbought at 67 suggests near-term "
+            f"consolidation risk. Capex cycle pull-forward may compress margins.",
+        )
         wait(1.6)
 
     print(dim("    → Research Manager adjudicates"))
     activate("Research Manager")
     wait(1.2, "Synthesising bull/bear arguments into a verdict…")
-    message("Research Manager",
-            "Verdict: The bull case prevails on a 12-month horizon. Revenue growth and "
-            "margin expansion outweigh near-term valuation concerns. Export risk is real "
-            "but management has demonstrated supply-chain agility. Recommend LONG with "
-            "a stop-loss at the 50-day SMA. Risk/reward favours buyers at current levels.")
+    message(
+        "Research Manager",
+        "Verdict: The bull case prevails on a 12-month horizon. Revenue growth and "
+        "margin expansion outweigh near-term valuation concerns. Export risk is real "
+        "but management has demonstrated supply-chain agility. Recommend LONG with "
+        "a stop-loss at the 50-day SMA. Risk/reward favours buyers at current levels.",
+    )
     wait(1.3)
 
     # ── Trading desk ──────────────────────────────────────────────────────────
-    print(f"\n  {dim('── Trading Desk')} {'─'*37}")
+    print(f"\n  {dim('── Trading Desk')} {'─' * 37}")
     activate("Trader")
     wait(1.4, "Formulating trade proposal with sizing & entry…")
-    message("Trader",
-            f"Trade proposal — {ticker}:\n"
-            f"  Action: BUY\n"
-            f"  Entry: market open, limit $487.50\n"
-            f"  Position size: 2.5% of AUM\n"
-            f"  Target: $560 (12-month, +15%)\n"
-            f"  Stop-loss: $441 (50-day SMA, −10%)\n"
-            f"  Rationale: Strong fundamental and technical confluence; "
-            f"risk/reward 1.5:1 at current price.")
+    message(
+        "Trader",
+        f"Trade proposal — {ticker}:\n"
+        f"  Action: BUY\n"
+        f"  Entry: market open, limit $487.50\n"
+        f"  Position size: 2.5% of AUM\n"
+        f"  Target: $560 (12-month, +15%)\n"
+        f"  Stop-loss: $441 (50-day SMA, −10%)\n"
+        f"  Rationale: Strong fundamental and technical confluence; "
+        f"risk/reward 1.5:1 at current price.",
+    )
     wait(1.4)
 
     # ── Risk management debate ─────────────────────────────────────────────────
-    print(f"\n  {dim('── Risk Management')} ({rounds} round{'s' if rounds > 1 else ''}) {'─'*25}")
+    print(f"\n  {dim('── Risk Management')} ({rounds} round{'s' if rounds > 1 else ''}) {'─' * 25}")
     risk_specs = [
-        ("Aggressive Analyst",   1.8, "Stress-testing upside scenario…",
-         "Upside scenario: AI adoption accelerates beyond consensus. "
-         "Data-centre spend from hyperscalers could push revenues to $60B+ next year. "
-         "Recommend a 3.5% position — the asymmetric payoff justifies above-average sizing."),
-        ("Conservative Analyst", 1.8, "Evaluating tail risks & drawdown…",
-         "Tail-risk assessment: A 20-25% China revenue headwind from export controls "
-         "represents the primary downside. Elevated valuation leaves little margin of "
-         "safety. Cap position at 1.5% of AUM; set stop-loss firmly at 50-day SMA."),
-        ("Neutral Analyst",      1.8, "Balancing risk vs reward…",
-         "Balanced view: Fundamental thesis is solid but near-term catalysts are largely "
-         "priced in. A 2.5% position with a trailing stop balances participation in the "
-         "AI upcycle with prudent downside protection. Review on next earnings release."),
+        (
+            "Aggressive Analyst",
+            1.8,
+            "Stress-testing upside scenario…",
+            "Upside scenario: AI adoption accelerates beyond consensus. "
+            "Data-centre spend from hyperscalers could push revenues to $60B+ next year. "
+            "Recommend a 3.5% position — the asymmetric payoff justifies above-average sizing.",
+        ),
+        (
+            "Conservative Analyst",
+            1.8,
+            "Evaluating tail risks & drawdown…",
+            "Tail-risk assessment: A 20-25% China revenue headwind from export controls "
+            "represents the primary downside. Elevated valuation leaves little margin of "
+            "safety. Cap position at 1.5% of AUM; set stop-loss firmly at 50-day SMA.",
+        ),
+        (
+            "Neutral Analyst",
+            1.8,
+            "Balancing risk vs reward…",
+            "Balanced view: Fundamental thesis is solid but near-term catalysts are largely "
+            "priced in. A 2.5% position with a trailing stop balances participation in the "
+            "AI upcycle with prudent downside protection. Review on next earnings release.",
+        ),
     ]
     for rnd in range(1, rounds + 1):
         print(dim(f"    Round {rnd}:"))
@@ -261,26 +364,28 @@ def main() -> None:
             wait(0.9)
 
     # ── Portfolio Manager ──────────────────────────────────────────────────────
-    print(f"\n  {dim('── Portfolio Management')} {'─'*30}")
+    print(f"\n  {dim('── Portfolio Management')} {'─' * 30}")
     activate("Portfolio Manager")
     wait(1.6, "Consolidating all reports into final 5-tier rating…")
-    message("Portfolio Manager",
-            f"Final assessment — {ticker}:\n"
-            f"All four analyst reports, the research team debate, and risk management "
-            f"review have been synthesised. The bull case is corroborated by strong "
-            f"fundamentals and positive technical momentum. Risk team agrees on a 2.5% "
-            f"position size with a defined stop.\n\n"
-            f"Rating: {signal}  |  Confidence: High\n"
-            f"Price target: $560 (12-month)  |  Stop-loss: $441")
+    message(
+        "Portfolio Manager",
+        f"Final assessment — {ticker}:\n"
+        f"All four analyst reports, the research team debate, and risk management "
+        f"review have been synthesised. The bull case is corroborated by strong "
+        f"fundamentals and positive technical momentum. Risk team agrees on a 2.5% "
+        f"position size with a defined stop.\n\n"
+        f"Rating: {signal}  |  Confidence: High\n"
+        f"Price target: $560 (12-month)  |  Stop-loss: $441",
+    )
     wait(1.6)
 
     # ── Completion ────────────────────────────────────────────────────────────
     sig_display = {
-        "BUY":  green("★  BUY  ★"),
-        "SELL": red(  "★  SELL  ★"),
+        "BUY": green("★  BUY  ★"),
+        "SELL": red("★  SELL  ★"),
         "HOLD": yellow("★  HOLD  ★"),
     }.get(signal, bold(signal))
-    print(f"\n  {dim('── Complete')} {'─'*41}")
+    print(f"\n  {dim('── Complete')} {'─' * 41}")
     print(f"  {sig_display}  ({ticker})")
 
     bridge.emit({"type": "workflow_complete", "signal": signal, "ticker": ticker})

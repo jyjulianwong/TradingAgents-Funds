@@ -3,7 +3,7 @@
  *
  * Exports:
  *   AGENT_CONFIGS   — array of { name, color, desk: THREE.Vector3, homeRotation?, seated? }
- *   CharacterManager — manages all 12 characters
+ *   CharacterManager — manages all 13 characters
  *
  * homeRotation (optional):
  *   Default Math.PI (face -Z, toward the ticker wall).  Override for characters
@@ -21,6 +21,11 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 // ─── Agent configuration ─────────────────────────────────────────────────────
 
 export const AGENT_CONFIGS = [
+  // ── Fund Analyst (one slot left of the analyst row, z = -9) ──────────────
+  // FORK(funds): the graph's gate node, run before any analyst — a no-op for
+  // an ordinary ticker, ISIN-to-proxy-ticker resolution for a fund.
+  { name: 'Fund Analyst',         color: 0x00BCD4, desk: new THREE.Vector3(-12.5, 0, -9) },
+
   // ── Analyst row (back, near ticker wall, z = -9) ──────────────────────────
   { name: 'Market Analyst',       color: 0x2196F3, desk: new THREE.Vector3(-7.5, 0, -9) },
   { name: 'Sentiment Analyst',    color: 0x9C27B0, desk: new THREE.Vector3(-2.5, 0, -9) },

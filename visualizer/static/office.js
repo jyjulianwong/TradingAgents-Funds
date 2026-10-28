@@ -5,7 +5,7 @@
  *
  *   z ≈ -15        Ticker / LED display wall  (front of office)
  *   z ≈ -13 to -11 Lounge: water cooler, coffee station, plants
- *   z ≈  -9        Analyst desks (4 agents)
+ *   z ≈  -9        Fund Analyst desk + analyst desks (5 agents)
  *   z ≈ -6 to -0.5 Meeting room: 4-wall glass enclosure, oval table, researchers
  *   z ≈   3        Trading desk row: Trader + 4 NPC desks
  *   z ≈   7        Risk management desks (3 agents)
