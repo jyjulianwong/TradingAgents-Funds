@@ -9,6 +9,7 @@ from tradingagents.agents.fund_context import (  # noqa: F401  # FORK(funds): fu
     fund_instrument_note,
     get_autonomous_agent_instruction,
     get_fund_analysis_instruction,
+    get_symbol_argument_instruction,
     is_isin,
     resolve_isin_ticker_list,
 )

@@ -5,8 +5,10 @@ from tradingagents.agents.context import (
     get_autonomous_agent_instruction,
     get_instrument_context_from_state,
     get_language_instruction,
+    get_symbol_argument_instruction,
     resolve_isin_ticker_list,
 )
+from tradingagents.agents.fund_tools import tools_for_run
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 from tradingagents.agents.tools import (
     get_balance_sheet,
@@ -61,6 +63,7 @@ def create_fundamentals_analyst(llm):
         system_message = (
             "You are a researcher tasked with analyzing fundamental information over the past year about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + isin_note
+            + get_symbol_argument_instruction(ticker, state)  # FORK(funds): fund
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements, and `get_insider_transactions` for recent insider buying and selling."
             + get_autonomous_agent_instruction()  # FORK(funds): hotfix #0001
@@ -89,7 +92,8 @@ def create_fundamentals_analyst(llm):
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(instrument_context=instrument_context)
 
-        result, report = take_turn(prompt, llm, TOOLS, state["messages"])
+        # FORK(funds): fund
+        result, report = take_turn(prompt, llm, tools_for_run(TOOLS, state), state["messages"])
         # FORK(funds): markdown-tables
         if report:
             report = ensure_blank_line_before_tables(report)

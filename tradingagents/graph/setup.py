@@ -22,6 +22,7 @@ from tradingagents.agents import (
     create_trader,
 )
 from tradingagents.agents.analysts.turn import WRAP_UP
+from tradingagents.agents.fund_tools import tool_node_tools
 from tradingagents.agents.state import AgentState
 
 from .analyst_execution import build_analyst_execution_plan
@@ -83,7 +84,7 @@ def _analyst_graph(spec, agent, max_tool_rounds: int):
                        spec.agent_node, max_tool_rounds, repeated)
         return agent({**state, "messages": [*state["messages"], HumanMessage(WRAP_UP)]})
 
-    graph.add_node("tools", ToolNode(list(spec.tools)))
+    graph.add_node("tools", ToolNode(tool_node_tools(spec.tools)))  # FORK(funds): fund
     graph.add_node("wrap_up", wrap_up)
     graph.add_conditional_edges("agent", _tools_or_done, ["tools", END])
     graph.add_conditional_edges("tools", more_or_wrap_up, ["agent", "wrap_up"])
