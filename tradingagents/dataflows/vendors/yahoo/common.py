@@ -10,10 +10,17 @@ from yfinance.exceptions import YFPricesMissingError, YFRateLimitError
 
 from tradingagents.dataflows.errors import NoMarketDataError, VendorUnavailableError
 from tradingagents.dataflows.net import vendor_reachable
+from tradingagents.fund_logging import quiet_library_warnings
 
 logger = logging.getLogger(__name__)
 
 YAHOO_HOST = "https://query2.finance.yahoo.com"
+
+# yfinance's own __init__.py installs a DeprecationWarning filter for its own
+# modules on import, in front of whatever was already registered. Re-applying ours
+# here, now that yfinance is guaranteed to be imported, puts it back in front of
+# yfinance's (see tradingagents/fund_logging.py).
+quiet_library_warnings()
 
 
 def price_text(value: float) -> str:
@@ -57,7 +64,8 @@ def _answered_empty(exc: Exception) -> bool:
     if isinstance(exc, YFPricesMissingError):
         reason = exc.yahoo_reason
         return "status_code" not in (exc.debug_info or "") and (
-            reason is None or reason.startswith("Data doesn't exist"))
+            reason is None or reason.startswith("Data doesn't exist")
+        )
     return getattr(getattr(exc, "response", None), "status_code", None) == 404
 
 
@@ -78,8 +86,10 @@ def yf_retry(func, max_retries=3, base_delay=2.0):
             return func()
         except YFRateLimitError as exc:
             if attempt < max_retries:
-                delay = base_delay * (2 ** attempt)
-                logger.warning(f"Yahoo Finance rate limited, retrying in {delay:.0f}s (attempt {attempt + 1}/{max_retries})")
+                delay = base_delay * (2**attempt)
+                logger.warning(
+                    f"Yahoo Finance rate limited, retrying in {delay:.0f}s (attempt {attempt + 1}/{max_retries})"
+                )
                 time.sleep(delay)
             else:
                 raise VendorUnavailableError(
@@ -88,4 +98,6 @@ def yf_retry(func, max_retries=3, base_delay=2.0):
         except Exception as exc:
             if _answered_empty(exc):
                 return None
-            raise VendorUnavailableError(f"Yahoo Finance request failed: {type(exc).__name__}") from exc
+            raise VendorUnavailableError(
+                f"Yahoo Finance request failed: {type(exc).__name__}"
+            ) from exc
