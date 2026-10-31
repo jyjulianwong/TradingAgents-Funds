@@ -5,7 +5,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-from tradingagents.agents.fund_context import (  # noqa: F401  # FORK(funds): fund, hotfix #0001
+from tradingagents.agents.fund_context import (  # noqa: F401  # FORK(funds): fund
     fund_instrument_note,
     get_autonomous_agent_instruction,
     get_fund_analysis_instruction,
