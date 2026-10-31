@@ -15,8 +15,9 @@ merge it with `git fetch TradingAgents main && git merge TradingAgents/main`.
 
   The text after the colon names the topic: `fund` (Fund Analyst / ISIN proxy support),
   `ohlcv-interval` (configurable candle interval), `markdown-tables` (blank line before tables),
-  `autonomous-agent` / `hotfix #000N` (prompt hotfixes), `cli-presets` (env-driven CLI skips),
-  `visualizer`, `reddit-feed-token`, `sentiment-window`.
+  `cli-presets` (env-driven CLI skips), `visualizer`, `reddit-feed-token`, `sentiment-window`.
+  A bare `FORK(funds)` marks a fork edit with no topic, such as the autonomous-agent prompt
+  instruction in the analysts.
   Import lines are left unmarked (a comment there makes isort reflow them); the code that
   uses the import is marked.
 
