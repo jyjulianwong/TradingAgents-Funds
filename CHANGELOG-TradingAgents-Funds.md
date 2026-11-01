@@ -29,13 +29,13 @@ Largest remaining edits (lines added/removed against upstream v0.7.0):
 - `tradingagents/agents/analysts/market_analyst.py` (+50) and `fundamentals_analyst.py` (+40): per-proxy-ticker loops and fund notes inside the analyst functions.
 - `cli/selections.py` (+39/-7): environment-driven skips for the analysis date and analysts prompts.
 - `tradingagents/reporting.py`, `graph/setup.py` (+21/-6), `graph/trading_graph.py` (+17/-2), `agents/state.py` (+14), `agents/tools.py` (+20): Fund Analyst section and banner, graph wiring, state fields, tool changes.
-- Bull/bear researchers, risk debaters, research manager, portfolio manager and trader: a fund-instruction hook, a markdown-table fix and an autonomous-agent hotfix in each prompt (about 14 lines per file).
+- Bull/bear researchers, risk debaters, research manager, portfolio manager and trader: a fund-instruction hook and a markdown-table fix in each prompt (about 14 lines per file); the autonomous-agent instruction is added to the four analysts only.
 
 Edits that are not fund features and could be split out or proposed upstream:
 
 - `ohlcv_interval` option (OHLCV files above).
 - Markdown blank-line-before-table fix applied to every agent output (`agents/markdown.py` plus hooks).
-- `get_autonomous_agent_instruction` prompt hotfixes (`FORK(funds): hotfix #0001` and `#0002`).
+- `get_autonomous_agent_instruction`, which tells the analysts not to ask for clarification, and the `1d` interval line in the Market Analyst prompt (bare `FORK(funds)` markers).
 - Reddit RSS feed-token support (`dataflows/vendors/reddit.py`).
 - Prompt wording changes (for example news "past week" became "past month").
 
