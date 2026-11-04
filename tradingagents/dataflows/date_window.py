@@ -42,9 +42,7 @@ def is_historical(run_date) -> bool:
     return bool(run_date) and str(run_date) < get_current_date()
 
 
-def coverage_gap(
-    dates, start_date: str, end_date: str, source: str, subject: str
-) -> str | None:
+def coverage_gap(dates, start_date: str, end_date: str, source: str, subject: str) -> str | None:
     """Placeholder for a window a feed did not fully observe, else None.
 
     Yahoo news and the Reddit and StockTwits feeds return their latest items
@@ -87,7 +85,9 @@ def as_of(requested: str | None, trade_date: str) -> str | None:
     parsed = _parse(requested)
     if not trade_date:
         return requested if parsed is None else f"{parsed:%Y-%m-%d}"
-    return f"{parsed:%Y-%m-%d}" if parsed is not None and parsed <= _parse(trade_date) else trade_date
+    return (
+        f"{parsed:%Y-%m-%d}" if parsed is not None and parsed <= _parse(trade_date) else trade_date
+    )
 
 
 def as_of_window(start_date: str, end_date: str, trade_date: str) -> tuple[str, str]:
@@ -102,7 +102,9 @@ def as_of_window(start_date: str, end_date: str, trade_date: str) -> tuple[str, 
     if start is None:
         raise ValueError(f"start_date {start_date!r} is not a date; give it as YYYY-MM-DD")
     if old_end is not None and start > old_end:
-        raise ValueError(f"start_date {start_date} is after end_date {end_date}; give the earlier date first")
+        raise ValueError(
+            f"start_date {start_date} is after end_date {end_date}; give the earlier date first"
+        )
     end = as_of(end_date, trade_date)
     end_dt = _parse(end)
     if end_dt is None or end_dt == old_end or start <= end_dt:
@@ -134,6 +136,29 @@ def withhold_live_profile(as_of_date: str | None, label: str) -> str | None:
         f"Serving them would put post-decision information into a {as_of_date} "
         f"analysis. Statements filed by {as_of_date} are served as filed where "
         f"the filing date is known (SEC EDGAR, for US filers)."
+    )
+
+
+# FORK(funds): earnings-outlook
+def withhold_live_estimates(as_of_date: str | None, label: str) -> str | None:
+    """Notice to serve instead of forward analyst estimates, or None to serve them.
+
+    Consensus EPS/revenue estimates, estimate-revision counts, and the next
+    earnings date all reflect today's market consensus with no historical
+    vintage (unlike an actual reported EPS, which carries a real filing/report
+    date) -- a past run would otherwise see today's forward-looking consensus,
+    not the one that existed on ``as_of_date``.
+    """
+    if not is_historical(as_of_date):
+        return None
+    return (
+        f"# Earnings Outlook for {label}\n"
+        f"# Point-in-time as of: {as_of_date}\n\n"
+        f"Forward earnings estimates are withheld for this date. Consensus EPS/"
+        f"revenue estimates, estimate-revision counts, and the next earnings "
+        f"date all reflect today's market consensus with no historical vintage, "
+        f"so serving them would put post-decision information into a "
+        f"{as_of_date} analysis."
     )
 
 

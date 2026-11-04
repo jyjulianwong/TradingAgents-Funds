@@ -1,5 +1,8 @@
 # Aggregates the per-category Alpha Vantage implementations into one module the
 # vendor router imports from; the imports below are the public surface.
+from tradingagents.dataflows.vendors.alpha_vantage.earnings import (  # FORK(funds): earnings-outlook
+    get_earnings_outlook,
+)
 from tradingagents.dataflows.vendors.alpha_vantage.fundamentals import (
     get_balance_sheet,
     get_cashflow,
@@ -21,6 +24,7 @@ from tradingagents.dataflows.vendors.alpha_vantage.symbol_search import (
 __all__ = [
     "get_balance_sheet",
     "get_cashflow",
+    "get_earnings_outlook",  # FORK(funds): earnings-outlook
     "get_fundamentals",
     "get_income_statement",
     "get_indicator",

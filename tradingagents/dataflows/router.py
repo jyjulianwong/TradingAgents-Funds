@@ -14,6 +14,7 @@ from tradingagents.dataflows.fund_vendors import (  # FORK(funds): fund
 from tradingagents.dataflows.vendors.alpha_vantage import (
     get_balance_sheet as get_alpha_vantage_balance_sheet,
     get_cashflow as get_alpha_vantage_cashflow,
+    get_earnings_outlook as get_alpha_vantage_earnings_outlook,  # FORK(funds): earnings-outlook
     get_fundamentals as get_alpha_vantage_fundamentals,
     get_global_news as get_alpha_vantage_global_news,
     get_income_statement as get_alpha_vantage_income_statement,
@@ -30,6 +31,9 @@ from tradingagents.dataflows.vendors.sec_edgar import (
     get_balance_sheet as get_sec_edgar_balance_sheet,
     get_cashflow as get_sec_edgar_cashflow,
     get_income_statement as get_sec_edgar_income_statement,
+)
+from tradingagents.dataflows.vendors.yahoo.earnings import (  # FORK(funds): earnings-outlook
+    get_earnings_outlook as get_yfinance_earnings_outlook,
 )
 from tradingagents.dataflows.vendors.yahoo.fundamentals import (
     get_balance_sheet as get_yfinance_balance_sheet,
@@ -48,26 +52,14 @@ logger = logging.getLogger(__name__)
 
 # Tools organized by category
 TOOLS_CATEGORIES = {
-    "core_stock_apis": {
-        "description": "OHLCV stock price data",
-        "tools": [
-            "get_stock_data"
-        ]
-    },
+    "core_stock_apis": {"description": "OHLCV stock price data", "tools": ["get_stock_data"]},
     "technical_indicators": {
         "description": "Technical analysis indicators",
-        "tools": [
-            "get_indicators"
-        ]
+        "tools": ["get_indicators"],
     },
     "fundamental_data": {
         "description": "Company fundamentals",
-        "tools": [
-            "get_fundamentals",
-            "get_balance_sheet",
-            "get_cashflow",
-            "get_income_statement"
-        ]
+        "tools": ["get_fundamentals", "get_balance_sheet", "get_cashflow", "get_income_statement"],
     },
     "news_data": {
         "description": "News and insider data",
@@ -75,20 +67,27 @@ TOOLS_CATEGORIES = {
             "get_news",
             "get_global_news",
             "get_insider_transactions",
-        ]
+        ],
     },
     "macro_data": {
         "description": "Macroeconomic indicators (rates, inflation, labor, growth)",
         "tools": [
             "get_macro_indicators",
-        ]
+        ],
+    },
+    # FORK(funds): earnings-outlook
+    "earnings_outlook": {
+        "description": "Forward earnings estimates, revisions, and upcoming earnings dates",
+        "tools": [
+            "get_earnings_outlook",
+        ],
     },
     "prediction_markets": {
         "description": "Market-implied probabilities for forward-looking events",
         "tools": [
             "get_prediction_markets",
-        ]
-    }
+        ],
+    },
 }
 
 TOOLS_CATEGORIES.update(FUND_TOOLS_CATEGORIES)  # FORK(funds): fund
@@ -98,7 +97,11 @@ TOOLS_CATEGORIES.update(FUND_TOOLS_CATEGORIES)  # FORK(funds): fund
 # sentinel instead of aborting the run (a bad LLM-supplied indicator, a missing
 # key, or a network blip should not crash an analysis over flavour data). Core
 # categories (prices, fundamentals, news) still raise so a broken primary is loud.
-OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
+OPTIONAL_CATEGORIES = {
+    "macro_data",
+    "prediction_markets",
+    "earnings_outlook",
+}  # FORK(funds): earnings-outlook
 
 OPTIONAL_CATEGORIES |= FUND_OPTIONAL_CATEGORIES  # FORK(funds): fund
 
@@ -150,6 +153,11 @@ VENDOR_METHODS = {
     # macro_data
     "get_macro_indicators": {
         "fred": get_fred_macro_data,
+    },
+    # earnings_outlook  # FORK(funds): earnings-outlook
+    "get_earnings_outlook": {
+        "yfinance": get_yfinance_earnings_outlook,
+        "alpha_vantage": get_alpha_vantage_earnings_outlook,
     },
     # prediction_markets
     "get_prediction_markets": {
@@ -211,7 +219,7 @@ def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
-    primary_vendors = [v.strip() for v in vendor_config.split(',')]
+    primary_vendors = [v.strip() for v in vendor_config.split(",")]
 
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")
@@ -236,7 +244,7 @@ def route_to_vendor(method: str, *args, **kwargs):
 
     last_no_data: NoMarketDataError | None = None
     last_unavailable: VendorUnavailableError | None = None
-    failed: Exception | None = None     # a vendor that raised something untyped
+    failed: Exception | None = None  # a vendor that raised something untyped
     first_error: Exception | None = None
     for vendor in vendor_chain:
         vendor_impl = VENDOR_METHODS[method][vendor]
@@ -245,7 +253,9 @@ def route_to_vendor(method: str, *args, **kwargs):
         try:
             return impl_func(*args, **kwargs)
         except VendorUnavailableError as e:
-            logger.warning("Vendor %r unavailable for %s: %s; trying next vendor.", vendor, method, e)
+            logger.warning(
+                "Vendor %r unavailable for %s: %s; trying next vendor.", vendor, method, e
+            )
             # Kept so an all-unavailable chain can say the vendor was the
             # problem, rather than reporting nothing about the symbol.
             last_unavailable = e
@@ -287,7 +297,8 @@ def route_to_vendor(method: str, *args, **kwargs):
             # verdict can't hide a broken primary (network/auth/etc.).
             logger.warning(
                 "Returning NO_DATA for %s, but a vendor errored earlier: %s",
-                method, first_error,
+                method,
+                first_error,
             )
         return no_data_available(last_no_data)
 
