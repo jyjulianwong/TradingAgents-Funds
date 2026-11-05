@@ -34,7 +34,7 @@ def create_market_analyst(llm):
         if mapped_tickers:
             symbols_fmt = ", ".join(f"`{s}`" for s in symbol_list)
             proxies_fmt = ", ".join(f"`{t}`" for t in mapped_tickers)
-            # FORK(funds): hotfix #0002
+            # FORK(funds)
             isin_note = (
                 f"\n\nThis instrument is a fund identified by ISIN `{ticker}`. Its"
                 f" price reflects the fund's Net Asset Value (NAV), computed once per"
@@ -94,8 +94,8 @@ Write a very detailed and nuanced report of the trends you observe. Provide spec
             + fund_note
             + get_symbol_argument_instruction(ticker, state)  # FORK(funds): fund
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
-            + " When calling get_stock_data, default to the '1d' interval unless the data clearly warrants a different granularity."  # FORK(funds): hotfix #0001
-            + get_autonomous_agent_instruction()  # FORK(funds): hotfix #0001
+            + " When calling get_stock_data, default to the '1d' interval unless the data clearly warrants a different granularity."  # FORK(funds)
+            + get_autonomous_agent_instruction()  # FORK(funds)
             + get_language_instruction()
         )
 

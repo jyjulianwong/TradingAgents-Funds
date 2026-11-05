@@ -81,7 +81,7 @@ def create_fundamentals_analyst(llm):
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements, `get_insider_transactions` for recent insider buying and selling, `get_valuation_history` for valuation vs. the instrument's own history, and `get_earnings_outlook` for forward earnings estimates and revisions."
             + valuation_note  # FORK(funds): earnings-outlook, valuation-history
-            + get_autonomous_agent_instruction()  # FORK(funds): hotfix #0001
+            + get_autonomous_agent_instruction()  # FORK(funds)
             + get_language_instruction()
         )
 
