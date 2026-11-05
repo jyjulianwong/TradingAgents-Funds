@@ -15,7 +15,9 @@ merge it with `git fetch TradingAgents main && git merge TradingAgents/main`.
 
   The text after the colon names the topic: `fund` (Fund Analyst / ISIN proxy support),
   `ohlcv-interval` (configurable candle interval), `markdown-tables` (blank line before tables),
-  `cli-presets` (env-driven CLI skips), `visualizer`, `reddit-feed-token`, `sentiment-window`.
+  `cli-presets` (env-driven CLI skips), `visualizer`, `reddit-feed-token`, `sentiment-window`,
+  `valuation-history` and `earnings-outlook` (the Fundamentals Analyst's valuation tools),
+  `debate-order` (Bear opens the research debate, Bull closes it).
   A bare `FORK(funds)` marks a fork edit with no topic, such as the autonomous-agent prompt
   instruction in the analysts.
   Import lines are left unmarked (a comment there makes isort reflow them); the code that
@@ -34,10 +36,12 @@ Fork behaviour is kept in fork-only modules; the upstream files carry only tagge
 | --- | --- | --- |
 | `agents/context.py` | `agents/fund_context.py` (ISIN detection, proxy-ticker resolution, fund and autonomous-agent prompt notes) | re-export import, `mapped_tickers` parameter, one `fund_instrument_note` call |
 | `agents/schemas.py` | `agents/fund_schemas.py` (`FundHoldingsAnalysis`) | none (untouched) |
-| `default_config.py` | `fund_config.py` (env overrides, fund vendors, `isin_ticker_map`, CLI presets, OHLCV interval) | four `**FUND_*` merges |
-| `dataflows/router.py` | `dataflows/fund_vendors.py` (fund fact-sheet and symbol-search routing) | three table merges |
+| `default_config.py` | `fund_config.py` (env overrides, fund vendors, `isin_ticker_map`, CLI presets, OHLCV interval, earnings-outlook vendor) | four `**FUND_*` merges |
+| `dataflows/router.py` | `dataflows/fund_vendors.py` (fund fact-sheet, symbol-search and earnings-outlook routing) | three table merges |
 | `reporting.py` | `fund_report.py` (`proxy_banner`) | one import, the Fund Analyst section row, one call |
 | `agents/tools.py` (per-instrument tools) | `agents/fund_tools.py` (symbol-selectable twins) | `ToolNode(tool_node_tools(...))` in `graph/setup.py`; `tools_for_run(...)` and a prompt sentence in the market, news and fundamentals analysts |
+| `agents/tools.py` (new tools) | `agents/fund_valuation_tools.py` (`get_valuation_history`, `get_earnings_outlook`); prompt text in `fund_context.get_valuation_instruction` | `TOOLS += VALUATION_TOOLS` and one `get_valuation_instruction()` call in the fundamentals analyst |
+| `dataflows/date_window.py` | `dataflows/fund_date_window.py` (`withhold_live_estimates`) | none (untouched) |
 
 ### Keeping the fund tools in step with upstream
 

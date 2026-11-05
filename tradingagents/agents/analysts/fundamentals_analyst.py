@@ -8,16 +8,16 @@ from tradingagents.agents.context import (
     get_symbol_argument_instruction,
     resolve_isin_ticker_list,
 )
+from tradingagents.agents.fund_context import get_valuation_instruction
 from tradingagents.agents.fund_tools import tools_for_run
+from tradingagents.agents.fund_valuation_tools import VALUATION_TOOLS
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 from tradingagents.agents.tools import (
     get_balance_sheet,
     get_cashflow,
-    get_earnings_outlook,  # FORK(funds): earnings-outlook
     get_fundamentals,
     get_income_statement,
     get_insider_transactions,
-    get_valuation_history,  # FORK(funds): valuation-history
 )
 
 # The tools this analyst is offered; its tool node is built from the same tuple.
@@ -27,9 +27,8 @@ TOOLS = (
     get_cashflow,
     get_income_statement,
     get_insider_transactions,
-    get_valuation_history,  # FORK(funds): valuation-history
-    get_earnings_outlook,  # FORK(funds): earnings-outlook
 )
+TOOLS += VALUATION_TOOLS  # FORK(funds): earnings-outlook, valuation-history
 
 
 def create_fundamentals_analyst(llm):
@@ -64,23 +63,13 @@ def create_fundamentals_analyst(llm):
             isin_note = ""
 
         # FORK(funds): fund
-        # FORK(funds): earnings-outlook, valuation-history
-        valuation_note = (
-            " Call `get_valuation_history` and `get_earnings_outlook` for every symbol you analyze."
-            " State the valuation read in plain terms (historically cheap, expensive, or mid-range"
-            " relative to the instrument's own history), not just the raw P/E number, and weight"
-            " earnings-revision breadth (how many estimates moved up vs. down) over the raw estimate"
-            " level. Both tools report 'not provided'/'not applicable' for an ETF or index proxy ticker,"
-            " which has no earnings coverage; state that plainly as a known gap rather than omitting the"
-            " section or guessing a value."
-        )
         system_message = (
             "You are a researcher tasked with analyzing fundamental information over the past year about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + isin_note
             + get_symbol_argument_instruction(ticker, state)  # FORK(funds): fund
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
-            + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements, `get_insider_transactions` for recent insider buying and selling, `get_valuation_history` for valuation vs. the instrument's own history, and `get_earnings_outlook` for forward earnings estimates and revisions."
-            + valuation_note  # FORK(funds): earnings-outlook, valuation-history
+            + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements, and `get_insider_transactions` for recent insider buying and selling."
+            + get_valuation_instruction()  # FORK(funds): earnings-outlook, valuation-history
             + get_autonomous_agent_instruction()  # FORK(funds)
             + get_language_instruction()
         )

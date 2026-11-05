@@ -13,6 +13,7 @@ from tradingagents.agents import tools as upstream_tools
 from tradingagents.agents.analysts import fundamentals_analyst, market_analyst, news_analyst
 from tradingagents.agents.fund_context import get_symbol_argument_instruction
 from tradingagents.agents.fund_tools import tool_node_tools, tools_for_run, with_symbol
+from tradingagents.agents.fund_valuation_tools import VALUATION_TOOLS
 from tradingagents.agents.state import AgentState
 
 ISIN = "GB00BVLL5586"
@@ -27,7 +28,7 @@ ALL_UPSTREAM = [
     getattr(upstream_tools, name)
     for name in dir(upstream_tools)
     if hasattr(getattr(upstream_tools, name), "func") and hasattr(getattr(upstream_tools, name), "args")
-]
+] + list(VALUATION_TOOLS)  # the fork's own tools get twins the same way
 
 
 def _run(tool_, state, **args):

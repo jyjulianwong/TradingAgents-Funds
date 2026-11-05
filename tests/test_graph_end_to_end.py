@@ -18,7 +18,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
-from tradingagents.agents import context, schemas, tools
+from tradingagents.agents import context, fund_valuation_tools, schemas
 from tradingagents.agents.analysts import sentiment_analyst
 from tradingagents.dataflows import router
 from tradingagents.dataflows.vendors.yahoo import market as yahoo_market, snapshot
@@ -114,7 +114,7 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshot, "load_ohlcv",
                         lambda *a, **k: called.add("ohlcv") or prices.copy())
     # FORK(funds): valuation-history — bypasses the router like the snapshot/ohlcv above.
-    monkeypatch.setattr(tools, "build_valuation_history",
+    monkeypatch.setattr(fund_valuation_tools, "build_valuation_history",
                         lambda *a, **k: called.add("valuation_history") or "mock valuation history")
     monkeypatch.setattr(sentiment_analyst, "fetch_stocktwits_messages", lambda *a, **k: "no posts")
     monkeypatch.setattr(sentiment_analyst, "fetch_reddit_posts", lambda *a, **k: "no posts")

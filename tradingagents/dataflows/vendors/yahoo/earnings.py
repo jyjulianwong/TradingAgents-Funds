@@ -5,7 +5,7 @@ from typing import Annotated
 
 import yfinance as yf
 
-from tradingagents.dataflows.date_window import withhold_live_estimates
+from tradingagents.dataflows.fund_date_window import withhold_live_estimates
 from tradingagents.dataflows.symbols import normalize_symbol
 from tradingagents.dataflows.vendors.yahoo.common import raise_for_empty, yf_retry
 

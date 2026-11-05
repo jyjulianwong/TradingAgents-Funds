@@ -5,7 +5,7 @@ targets and the next earnings date all reflect today's market consensus with
 no historical vintage (unlike a reported EPS, which carries a real report
 date) -- a past run would otherwise see today's forward-looking consensus,
 not the one that existed on ``as_of_date``. Both vendors withhold on one
-shared rule (``date_window.withhold_live_estimates``), mirroring the existing
+shared rule (``fund_date_window.withhold_live_estimates``), mirroring the existing
 ``withhold_live_profile`` rule for company-overview fields (#1300).
 """
 

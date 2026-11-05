@@ -171,8 +171,6 @@ def build_default_config() -> dict:
         "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance
             "news_data": "yfinance",             # Options: alpha_vantage, yfinance
             "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
-            # FORK(funds): earnings-outlook
-            "earnings_outlook": "yfinance,alpha_vantage",  # Options: yfinance, alpha_vantage
             "prediction_markets": "polymarket",  # Options: polymarket (keyless)
             **FUND_DATA_VENDORS,  # FORK(funds): fund
         },

@@ -14,7 +14,6 @@ from tradingagents.dataflows.fund_vendors import (  # FORK(funds): fund
 from tradingagents.dataflows.vendors.alpha_vantage import (
     get_balance_sheet as get_alpha_vantage_balance_sheet,
     get_cashflow as get_alpha_vantage_cashflow,
-    get_earnings_outlook as get_alpha_vantage_earnings_outlook,
     get_fundamentals as get_alpha_vantage_fundamentals,
     get_global_news as get_alpha_vantage_global_news,
     get_income_statement as get_alpha_vantage_income_statement,
@@ -31,9 +30,6 @@ from tradingagents.dataflows.vendors.sec_edgar import (
     get_balance_sheet as get_sec_edgar_balance_sheet,
     get_cashflow as get_sec_edgar_cashflow,
     get_income_statement as get_sec_edgar_income_statement,
-)
-from tradingagents.dataflows.vendors.yahoo.earnings import (
-    get_earnings_outlook as get_yfinance_earnings_outlook,
 )
 from tradingagents.dataflows.vendors.yahoo.fundamentals import (
     get_balance_sheet as get_yfinance_balance_sheet,
@@ -87,13 +83,6 @@ TOOLS_CATEGORIES = {
             "get_macro_indicators",
         ]
     },
-    # FORK(funds): earnings-outlook
-    "earnings_outlook": {
-        "description": "Forward earnings estimates, revisions, and upcoming earnings dates",
-        "tools": [
-            "get_earnings_outlook",
-        ]
-    },
     "prediction_markets": {
         "description": "Market-implied probabilities for forward-looking events",
         "tools": [
@@ -110,7 +99,6 @@ TOOLS_CATEGORIES.update(FUND_TOOLS_CATEGORIES)  # FORK(funds): fund
 # key, or a network blip should not crash an analysis over flavour data). Core
 # categories (prices, fundamentals, news) still raise so a broken primary is loud.
 OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
-OPTIONAL_CATEGORIES.add("earnings_outlook")  # FORK(funds): earnings-outlook
 
 OPTIONAL_CATEGORIES |= FUND_OPTIONAL_CATEGORIES  # FORK(funds): fund
 
@@ -162,11 +150,6 @@ VENDOR_METHODS = {
     # macro_data
     "get_macro_indicators": {
         "fred": get_fred_macro_data,
-    },
-    # earnings_outlook  # FORK(funds): earnings-outlook
-    "get_earnings_outlook": {
-        "yfinance": get_yfinance_earnings_outlook,
-        "alpha_vantage": get_alpha_vantage_earnings_outlook,
     },
     # prediction_markets
     "get_prediction_markets": {

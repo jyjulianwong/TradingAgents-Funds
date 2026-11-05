@@ -1,16 +1,22 @@
 """Fork-only vendor routing entries for fund support (kept out of ``router.py``).
 
 ``router.py`` merges these tables into its own with one tagged line each:
-the fund fact-sheet and ticker-symbol-search tool categories, which of them are
-optional, and the vendor implementations behind each tool.
+the fund fact-sheet, ticker-symbol-search and earnings-outlook tool categories,
+which of them are optional, and the vendor implementations behind each tool.
 """
 
 from tradingagents.dataflows.vendors.alpha_vantage import (
     get_symbol_matches as get_alpha_vantage_symbol_matches,
 )
+from tradingagents.dataflows.vendors.alpha_vantage.earnings import (
+    get_earnings_outlook as get_alpha_vantage_earnings_outlook,
+)
 from tradingagents.dataflows.vendors.hl_fund import get_fund_holdings as get_hl_fund_holdings
 from tradingagents.dataflows.vendors.mstarpy_fund import (
     get_fund_holdings as get_mstarpy_fund_holdings,
+)
+from tradingagents.dataflows.vendors.yahoo.earnings import (
+    get_earnings_outlook as get_yfinance_earnings_outlook,
 )
 
 FUND_TOOLS_CATEGORIES = {
@@ -26,6 +32,13 @@ FUND_TOOLS_CATEGORIES = {
             "search_ticker_symbol",
         ],
     },
+    # FORK(funds): earnings-outlook
+    "earnings_outlook": {
+        "description": "Forward earnings estimates, revisions, and upcoming earnings dates",
+        "tools": [
+            "get_earnings_outlook",
+        ],
+    },
 }
 
 # fund_fact_sheet_data joins this set for a different reason: mstarpy drives a
@@ -38,10 +51,13 @@ FUND_TOOLS_CATEGORIES = {
 # rate-limited, network error) without that ever blocking a run — see
 # fund_analyst.py's _verify_ticker, which treats an unreachable vendor as "no
 # verdict" rather than a failure.
+# earnings_outlook is optional like macro_data: flavour for the Fundamentals
+# Analyst, and an ETF/index proxy ticker has no earnings coverage at all.
 # FORK(funds): fund
 FUND_OPTIONAL_CATEGORIES = {
     "fund_fact_sheet_data",
     "ticker_symbol_search",
+    "earnings_outlook",
 }
 
 FUND_VENDOR_METHODS = {
@@ -60,5 +76,10 @@ FUND_VENDOR_METHODS = {
     # fund_fact_sheet_data grew a second vendor.
     "search_ticker_symbol": {
         "alpha_vantage": get_alpha_vantage_symbol_matches,
+    },
+    # earnings_outlook  # FORK(funds): earnings-outlook
+    "get_earnings_outlook": {
+        "yfinance": get_yfinance_earnings_outlook,
+        "alpha_vantage": get_alpha_vantage_earnings_outlook,
     },
 }
