@@ -42,7 +42,9 @@ def is_historical(run_date) -> bool:
     return bool(run_date) and str(run_date) < get_current_date()
 
 
-def coverage_gap(dates, start_date: str, end_date: str, source: str, subject: str) -> str | None:
+def coverage_gap(
+    dates, start_date: str, end_date: str, source: str, subject: str
+) -> str | None:
     """Placeholder for a window a feed did not fully observe, else None.
 
     Yahoo news and the Reddit and StockTwits feeds return their latest items
@@ -85,9 +87,7 @@ def as_of(requested: str | None, trade_date: str) -> str | None:
     parsed = _parse(requested)
     if not trade_date:
         return requested if parsed is None else f"{parsed:%Y-%m-%d}"
-    return (
-        f"{parsed:%Y-%m-%d}" if parsed is not None and parsed <= _parse(trade_date) else trade_date
-    )
+    return f"{parsed:%Y-%m-%d}" if parsed is not None and parsed <= _parse(trade_date) else trade_date
 
 
 def as_of_window(start_date: str, end_date: str, trade_date: str) -> tuple[str, str]:
@@ -102,9 +102,7 @@ def as_of_window(start_date: str, end_date: str, trade_date: str) -> tuple[str, 
     if start is None:
         raise ValueError(f"start_date {start_date!r} is not a date; give it as YYYY-MM-DD")
     if old_end is not None and start > old_end:
-        raise ValueError(
-            f"start_date {start_date} is after end_date {end_date}; give the earlier date first"
-        )
+        raise ValueError(f"start_date {start_date} is after end_date {end_date}; give the earlier date first")
     end = as_of(end_date, trade_date)
     end_dt = _parse(end)
     if end_dt is None or end_dt == old_end or start <= end_dt:
