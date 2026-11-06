@@ -27,6 +27,7 @@ from tradingagents.dataflows.vendors.jyjw_mrd import (
     JyjwMrdUnavailableError,
     fetch_jyjw_mrd_latest,
 )
+from tradingagents.reporting import write_report_tree
 
 ISIN = "IE00B4L5Y983"
 FUND_ANALYST = "tradingagents.agents.analysts.fund_analyst"
@@ -233,7 +234,10 @@ class TestFundAnalystRegime:
             "https://6nbosjpuc9.execute-api.eu-west-2.amazonaws.com", "allweather-hmm2naive-us"
         )
         assert "GROWTH_DOWN_INFLATION_UP" in result["jyjw_mrd_report"]
-        assert "GROWTH_DOWN_INFLATION_UP" in result["fund_report"]
+        # The fund report records only the headline; the full block is saved on its own.
+        assert "`GROWTH_DOWN_INFLATION_UP` (confidence 49%" in result["fund_report"]
+        assert "allweather-hmm2naive-us" in result["fund_report"]
+        assert "trend features" not in result["fund_report"]
         # The analysts read instrument_context; the regime must stay out of it.
         assert "MACRO REGIME" not in result["instrument_context"]
 
@@ -326,3 +330,17 @@ class TestDebatePrompts:
         llm.invoke.return_value = mock.Mock(content="Rating: Hold")
         create_research_manager(llm)(_debate_state("REGIME-BLOCK-123"))
         assert "REGIME-BLOCK-123" in _prompt_text(llm)
+
+
+# ---------------------------------------------------------------------------
+# Saved report
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_saved_report_includes_the_regime_file(tmp_path):
+    state = {"fund_report": "fund", "jyjw_mrd_report": "REGIME-BLOCK-123"}
+    complete = write_report_tree(state, ISIN, tmp_path, html=False)
+    saved = tmp_path / "1_analysts" / "jyjw_mrd.md"
+    assert saved.read_text(encoding="utf-8") == "REGIME-BLOCK-123"
+    assert "### Market Regime Detector" in complete.read_text(encoding="utf-8")

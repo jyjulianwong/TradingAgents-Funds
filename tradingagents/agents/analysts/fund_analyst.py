@@ -40,6 +40,8 @@ Detector's latest US All Weather nowcast (``_fetch_jyjw_mrd``) into
 ``state["jyjw_mrd_report"]``, read only by the investment debate (see
 ``agents/fund_jyjw_mrd.py``). The endpoint only describes today, so a
 historical run, backtests included, skips it rather than leak a later regime.
+The fund report records only a one-line headline; the full block is saved on
+its own as ``1_analysts/jyjw_mrd.md``.
 
 It also fetches the Investment News Analysis AI report published on or before
 the trade date into ``state["jyjw_inaai_report"]``, likewise
@@ -59,7 +61,11 @@ from tradingagents.agents.context import (
 )
 from tradingagents.agents.fund_data_tools import get_fund_fact_sheet
 from tradingagents.agents.fund_jyjw_inaai import fetch_jyjw_inaai
-from tradingagents.agents.fund_jyjw_mrd import jyjw_mrd_unavailable_note, render_jyjw_mrd_block
+from tradingagents.agents.fund_jyjw_mrd import (
+    jyjw_mrd_source_note,
+    jyjw_mrd_unavailable_note,
+    render_jyjw_mrd_block,
+)
 from tradingagents.agents.fund_schemas import FundHoldingsAnalysis
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 from tradingagents.agents.structured import NO_EXTERNAL_TOOLS, bind_structured
@@ -116,11 +122,11 @@ def _fetch_jyjw_mrd(trade_date: str | None) -> tuple[str, str]:
             "**US macro regime**: skipped (historical run; the nowcast only describes today).",
         )
     try:
-        block = render_jyjw_mrd_block(fetch_jyjw_mrd_latest(base_url, model_name))
+        payload = fetch_jyjw_mrd_latest(base_url, model_name)
     except JyjwMrdUnavailableError as exc:
         logger.warning("Fund Analyst: jyjw-mrd market regime unavailable: %s", exc)
         return "", jyjw_mrd_unavailable_note(str(exc))
-    return block, block
+    return render_jyjw_mrd_block(payload), jyjw_mrd_source_note(payload, model_name)
 
 
 def _fetch_jyjw_inaai(trade_date: str | None) -> tuple[str, str]:

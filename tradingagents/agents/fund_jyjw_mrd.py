@@ -140,6 +140,22 @@ def render_jyjw_mrd_block(payload: Mapping[str, Any]) -> str:
     return ensure_blank_line_before_tables("\n".join(lines))
 
 
+def jyjw_mrd_source_note(payload: Mapping[str, Any], model_name: str) -> str:
+    """One-line note naming the regime used, for the Fund Analyst's report.
+
+    The full block is saved on its own (``jyjw_mrd.md``), so the fund report
+    only records the headline.
+    """
+    latest = payload.get("latest") or {}
+    regime = str(latest.get("regime", "UNKNOWN"))
+    stale = ", STALE" if payload.get("is_stale") else ""
+    return (
+        f"**US macro regime**: `{regime}` (confidence {_pct(latest.get('confidence'))}{stale};"
+        f" as of {payload.get('asof', 'n/a')}, model `{model_name}`),"
+        " passed to the investment debate."
+    )
+
+
 def jyjw_mrd_unavailable_note(reason: str) -> str:
     """One-line block recorded when the regime could not be fetched for a live run."""
     return f"**US MACRO REGIME**: unavailable for this run ({reason})."
