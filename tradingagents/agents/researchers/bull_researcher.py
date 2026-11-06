@@ -5,6 +5,7 @@ from tradingagents.agents.context import (
     opponent_argument_or_opening,
     report_or_absent,
 )
+from tradingagents.agents.fund_macro_regime import get_macro_regime_instruction
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 
 
@@ -55,6 +56,7 @@ Last bear argument: {current_response}
 Use this information to deliver a compelling bull argument, refute the bear's concerns, and engage in a dynamic debate that demonstrates the strengths of the bull position.
 """
             + get_fund_analysis_instruction(ticker, state)
+            + get_macro_regime_instruction(state)  # FORK(funds): macro-regime
             + get_language_instruction()
         )
 

@@ -8,6 +8,8 @@ and the fund / CLI-preset defaults.
 # Environment variables -> config keys (merged into ``_ENV_OVERRIDES``).
 FUND_ENV_OVERRIDES = {
     "TRADINGAGENTS_ISIN_TICKER_MAP_OVERRIDE": "isin_ticker_map_override",
+    "TRADINGAGENTS_MARKET_REGIME_API_URL": "market_regime_api_url",
+    "TRADINGAGENTS_MARKET_REGIME_MODEL": "market_regime_model_name",
     # CLI-only presets
     "TRADINGAGENTS_ANALYSIS_DATE": "analysis_date",
     "TRADINGAGENTS_ANALYSTS": "analysts",
@@ -48,6 +50,13 @@ FUND_DEFAULTS = {
     # map (e.g. to avoid LLM/vendor variability run-to-run, or when neither
     # mstarpy/hl nor an LLM/Alpha Vantage key is available).
     "isin_ticker_map_override": False,
+    # Market Regime Detector: the Fund Analyst fetches its latest US All
+    # Weather nowcast for live fund runs, for the investment debate (Bull,
+    # Bear, Research Manager) to weigh. Historical runs and backtests skip it.
+    # An empty URL turns it off (the env override cannot set an empty value,
+    # so set the key in a config dict to disable it programmatically).
+    "market_regime_api_url": "https://6nbosjpuc9.execute-api.eu-west-2.amazonaws.com",
+    "market_regime_model_name": "allweather-hmm2naive-us",
     # ISIN-to-ticker mapping — static BACKUP only (unless the override above
     # is set, in which case it's the only source used).
     #

@@ -61,6 +61,8 @@ class AgentState(MessagesState):
         "'isin_ticker_map fallback', or 'none'",
     ]
     fund_report: Annotated[str, "Report from the Fund Analyst"]
+    # FORK(funds): macro-regime
+    macro_regime_report: Annotated[str, "US macro regime block for the investment debate; empty when skipped"]
 
     # research step
     market_report: Annotated[str, "Report from the Market Analyst"]
