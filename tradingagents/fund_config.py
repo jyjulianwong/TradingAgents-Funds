@@ -23,6 +23,9 @@ FUND_DATA_VENDORS = {
     # Verifies a Fund Analyst-picked proxy ticker against a live symbol
     # database; optional (needs ALPHA_VANTAGE_API_KEY) -- see fund_analyst.py.
     "ticker_symbol_search": "alpha_vantage",
+    # Forward earnings estimates/revisions for the Fundamentals Analyst's
+    # get_earnings_outlook tool. Options: yfinance, alpha_vantage
+    "earnings_outlook": "yfinance,alpha_vantage",
 }
 
 # Merged into ``tool_vendors``.

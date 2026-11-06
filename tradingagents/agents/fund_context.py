@@ -144,6 +144,26 @@ def get_autonomous_agent_instruction() -> str:
     )
 
 
+# FORK(funds): earnings-outlook, valuation-history
+def get_valuation_instruction() -> str:
+    """Return the Fundamentals Analyst's instruction for the fork's valuation tools.
+
+    Appended to its system message alongside upstream's own tool list, which
+    names only upstream's tools (see ``agents/fund_valuation_tools.py``).
+    """
+    return (
+        " Also use `get_valuation_history` for valuation vs. the instrument's own history,"
+        " and `get_earnings_outlook` for forward earnings estimates and revisions."
+        " Call `get_valuation_history` and `get_earnings_outlook` for every symbol you analyze."
+        " State the valuation read in plain terms (historically cheap, expensive, or mid-range"
+        " relative to the instrument's own history), not just the raw P/E number, and weight"
+        " earnings-revision breadth (how many estimates moved up vs. down) over the raw estimate"
+        " level. Both tools report 'not provided'/'not applicable' for an ETF or index proxy ticker,"
+        " which has no earnings coverage; state that plainly as a known gap rather than omitting the"
+        " section or guessing a value."
+    )
+
+
 def fund_instrument_note(ticker: str, mapped_tickers: list[str] | None) -> str:
     """The sentence ``build_instrument_context`` appends when the instrument is a fund.
 

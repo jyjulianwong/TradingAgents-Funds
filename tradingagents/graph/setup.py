@@ -179,7 +179,7 @@ class GraphSetup:
             # FORK(funds): fund
             workflow.add_edge(START, "Memory Log")
             first_steps.append("Memory Log")
-        workflow.add_edge(first_steps, "Bull Researcher")
+        workflow.add_edge(first_steps, "Bear Researcher")  # FORK(funds): debate-order
 
         # Both research-debate edges share the complete DEBATE_PATH_MAP (#1088).
         for debate_node in ("Bull Researcher", "Bear Researcher"):

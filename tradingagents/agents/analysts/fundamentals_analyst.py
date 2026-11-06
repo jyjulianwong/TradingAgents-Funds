@@ -8,7 +8,9 @@ from tradingagents.agents.context import (
     get_symbol_argument_instruction,
     resolve_isin_ticker_list,
 )
+from tradingagents.agents.fund_context import get_valuation_instruction
 from tradingagents.agents.fund_tools import tools_for_run
+from tradingagents.agents.fund_valuation_tools import VALUATION_TOOLS
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 from tradingagents.agents.tools import (
     get_balance_sheet,
@@ -26,6 +28,7 @@ TOOLS = (
     get_income_statement,
     get_insider_transactions,
 )
+TOOLS += VALUATION_TOOLS  # FORK(funds): earnings-outlook, valuation-history
 
 
 def create_fundamentals_analyst(llm):
@@ -66,6 +69,7 @@ def create_fundamentals_analyst(llm):
             + get_symbol_argument_instruction(ticker, state)  # FORK(funds): fund
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements, and `get_insider_transactions` for recent insider buying and selling."
+            + get_valuation_instruction()  # FORK(funds): earnings-outlook, valuation-history
             + get_autonomous_agent_instruction()  # FORK(funds)
             + get_language_instruction()
         )

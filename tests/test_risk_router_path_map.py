@@ -79,3 +79,27 @@ def test_debate_path_map_covers_full_router_range():
     }
     assert returns <= set(DEBATE_PATH_MAP)
     assert "Research Manager" in returns  # terminal reachable
+
+
+# FORK(funds): debate-order — Bear opens, Bull closes (was Bull-then-Bear), to
+# remove the bearish side's recency advantage before the Research Manager
+# reads the transcript (see conditional_logic.py).
+@pytest.mark.unit
+def test_debate_opens_with_bear_not_bull():
+    logic = ConditionalLogic(max_debate_rounds=1)
+    # No speaker yet (empty current_response): the debate must open with Bear.
+    assert logic.should_continue_debate(_debate_state("")) == "Bear Researcher"
+
+
+@pytest.mark.unit
+def test_debate_bear_then_bull_order():
+    logic = ConditionalLogic(max_debate_rounds=1)
+    # After Bear's opening turn, Bull speaks (and closes) the single round.
+    assert (
+        logic.should_continue_debate(_debate_state("Bear Analyst: ...", count=1))
+        == "Bull Researcher"
+    )
+    assert (
+        logic.should_continue_debate(_debate_state("Bull Analyst: ...", count=2))
+        == "Research Manager"
+    )

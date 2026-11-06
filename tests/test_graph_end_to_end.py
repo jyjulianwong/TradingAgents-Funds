@@ -18,7 +18,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
-from tradingagents.agents import context, schemas
+from tradingagents.agents import context, fund_valuation_tools, schemas
 from tradingagents.agents.analysts import sentiment_analyst
 from tradingagents.dataflows import router
 from tradingagents.dataflows.vendors.yahoo import market as yahoo_market, snapshot
@@ -113,6 +113,9 @@ def offline(monkeypatch, tmp_path):
     })
     monkeypatch.setattr(snapshot, "load_ohlcv",
                         lambda *a, **k: called.add("ohlcv") or prices.copy())
+    # FORK(funds): valuation-history — bypasses the router like the snapshot/ohlcv above.
+    monkeypatch.setattr(fund_valuation_tools, "build_valuation_history",
+                        lambda *a, **k: called.add("valuation_history") or "mock valuation history")
     monkeypatch.setattr(sentiment_analyst, "fetch_stocktwits_messages", lambda *a, **k: "no posts")
     monkeypatch.setattr(sentiment_analyst, "fetch_reddit_posts", lambda *a, **k: "no posts")
     monkeypatch.setattr(yahoo_market.yf, "Ticker", lambda s: type("T", (), {"info": {"longName": "NVIDIA"}})())
@@ -142,7 +145,8 @@ def test_a_full_run_reaches_a_logged_decision(tmp_path, monkeypatch, offline, st
     tool_methods = {"get_stock_data", "get_indicators", "get_news", "get_global_news",
                     "get_macro_indicators", "get_prediction_markets", "get_fundamentals",
                     "get_balance_sheet", "get_cashflow", "get_income_statement",
-                    "get_insider_transactions", "ohlcv"}
+                    "get_insider_transactions", "ohlcv",
+                    "get_earnings_outlook", "valuation_history"}  # FORK(funds)
     assert offline == tool_methods
     assert [e["rating"] for e in graph.memory_log.load_entries()] == ["Overweight"]
 
