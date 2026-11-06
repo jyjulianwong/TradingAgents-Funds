@@ -36,10 +36,17 @@ debaters, trader, portfolio manager — sees the same, dynamically-resolved
 proxy list without recomputing it.
 
 For a live run (``trade_date`` is today) it also fetches the Market Regime
-Detector's latest US All Weather nowcast (``_fetch_macro_regime``) into
-``state["macro_regime_report"]``, read only by the investment debate (see
-``agents/fund_macro_regime.py``). The endpoint only describes today, so a
+Detector's latest US All Weather nowcast (``_fetch_jyjw_mrd``) into
+``state["jyjw_mrd_report"]``, read only by the investment debate (see
+``agents/fund_jyjw_mrd.py``). The endpoint only describes today, so a
 historical run, backtests included, skips it rather than leak a later regime.
+The fund report records only a one-line headline; the full block is saved on
+its own as ``1_analysts/jyjw_mrd.md``.
+
+It also fetches the Investment News Analysis AI report published on or before
+the trade date into ``state["jyjw_inaai_report"]``, likewise
+read only by the investment debate (see ``agents/fund_jyjw_inaai.py``).
+Reports are dated, so historical runs read their own date's report.
 """
 
 from __future__ import annotations
@@ -53,16 +60,21 @@ from tradingagents.agents.context import (
     resolve_isin_ticker_list,
 )
 from tradingagents.agents.fund_data_tools import get_fund_fact_sheet
-from tradingagents.agents.fund_macro_regime import regime_unavailable_note, render_regime_block
+from tradingagents.agents.fund_jyjw_inaai import fetch_jyjw_inaai
+from tradingagents.agents.fund_jyjw_mrd import (
+    jyjw_mrd_source_note,
+    jyjw_mrd_unavailable_note,
+    render_jyjw_mrd_block,
+)
 from tradingagents.agents.fund_schemas import FundHoldingsAnalysis
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 from tradingagents.agents.structured import NO_EXTERNAL_TOOLS, bind_structured
 from tradingagents.agents.symbol_search_tools import search_ticker_symbol
 from tradingagents.dataflows.config import get_config
 from tradingagents.dataflows.date_window import is_historical
-from tradingagents.dataflows.vendors.market_regime import (
-    MarketRegimeUnavailableError,
-    fetch_latest_regime,
+from tradingagents.dataflows.vendors.jyjw_mrd import (
+    JyjwMrdUnavailableError,
+    fetch_jyjw_mrd_latest,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,17 +101,17 @@ def _fetch_fact_sheet(isin: str) -> str | None:
     return text
 
 
-def _fetch_macro_regime(trade_date: str | None) -> tuple[str, str]:
-    """Return ``(macro_regime_report, fund_report_section)`` for this run.
+def _fetch_jyjw_mrd(trade_date: str | None) -> tuple[str, str]:
+    """Return ``(jyjw_mrd_report, fund_report_section)`` for this run.
 
-    ``macro_regime_report`` is the block the debate agents read; it is empty
+    ``jyjw_mrd_report`` is the block the debate agents read; it is empty
     whenever the regime is skipped or unavailable, so they see nothing rather
     than a stale or missing regime. ``fund_report_section`` records what
     happened either way, for the saved report.
     """
     config = get_config()
-    base_url = config.get("market_regime_api_url")
-    model_name = config.get("market_regime_model_name")
+    base_url = config.get("jyjw_mrd_api_url")
+    model_name = config.get("jyjw_mrd_model_name")
     if not base_url or not model_name:
         return "", ""
     # /latest only ever describes today: a run without a date, or dated
@@ -110,11 +122,21 @@ def _fetch_macro_regime(trade_date: str | None) -> tuple[str, str]:
             "**US macro regime**: skipped (historical run; the nowcast only describes today).",
         )
     try:
-        block = render_regime_block(fetch_latest_regime(base_url, model_name))
-    except MarketRegimeUnavailableError as exc:
-        logger.warning("Fund Analyst: market regime unavailable: %s", exc)
-        return "", regime_unavailable_note(str(exc))
-    return block, block
+        payload = fetch_jyjw_mrd_latest(base_url, model_name)
+    except JyjwMrdUnavailableError as exc:
+        logger.warning("Fund Analyst: jyjw-mrd market regime unavailable: %s", exc)
+        return "", jyjw_mrd_unavailable_note(str(exc))
+    return render_jyjw_mrd_block(payload), jyjw_mrd_source_note(payload, model_name)
+
+
+def _fetch_jyjw_inaai(trade_date: str | None) -> tuple[str, str]:
+    """Return ``(jyjw_inaai_report, fund_report_section)`` for this run."""
+    config = get_config()
+    return fetch_jyjw_inaai(
+        config.get("jyjw_inaai_report_url"),
+        trade_date,
+        int(config.get("jyjw_inaai_lookback_days") or 0),
+    )
 
 
 def _match_symbols(table_text: str) -> set[str]:
@@ -229,7 +251,8 @@ def _render_fund_report(
     rationale: str,
     fact_sheet: str | None,
     verification: dict[str, bool | None] | None = None,
-    regime_section: str = "",
+    jyjw_mrd_section: str = "",
+    jyjw_inaai_section: str = "",
 ) -> str:
     lines = [
         f"**Instrument**: `{isin}` (fund ISIN)",
@@ -251,8 +274,10 @@ def _render_fund_report(
         )
     if rationale:
         lines.extend(["", f"**Rationale**: {rationale}"])
-    if regime_section:
-        lines.extend(["", regime_section])
+    if jyjw_mrd_section:
+        lines.extend(["", jyjw_mrd_section])
+    if jyjw_inaai_section:
+        lines.extend(["", jyjw_inaai_section])
     if fact_sheet:
         lines.extend(["", "**Fact sheet (mstarpy)**:", fact_sheet])
     return ensure_blank_line_before_tables("\n".join(lines))
@@ -267,7 +292,8 @@ def _finalize(
     fact_sheet: str | None,
     verification: dict[str, bool | None],
 ) -> dict:
-    macro_regime_report, regime_section = _fetch_macro_regime(state.get("trade_date"))
+    jyjw_mrd_report, jyjw_mrd_section = _fetch_jyjw_mrd(state.get("trade_date"))
+    jyjw_inaai_report, jyjw_inaai_section = _fetch_jyjw_inaai(state.get("trade_date"))
     identity = resolve_instrument_identity(ticker)
     instrument_context = build_instrument_context(
         ticker,
@@ -279,9 +305,17 @@ def _finalize(
         "fund_proxy_tickers": proxy_tickers,
         "fund_proxy_source": source,
         "instrument_context": instrument_context,
-        "macro_regime_report": macro_regime_report,
+        "jyjw_mrd_report": jyjw_mrd_report,
+        "jyjw_inaai_report": jyjw_inaai_report,
         "fund_report": _render_fund_report(
-            ticker, source, proxy_tickers, rationale, fact_sheet, verification, regime_section
+            ticker,
+            source,
+            proxy_tickers,
+            rationale,
+            fact_sheet,
+            verification,
+            jyjw_mrd_section,
+            jyjw_inaai_section,
         ),
     }
 

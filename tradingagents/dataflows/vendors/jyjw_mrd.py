@@ -16,23 +16,23 @@ from tradingagents.dataflows.net import get_scrubbed
 _TIMEOUT_SECONDS = 15.0
 
 
-class MarketRegimeUnavailableError(VendorUnavailableError):
+class JyjwMrdUnavailableError(VendorUnavailableError):
     """The Market Regime Detector could not answer, or answered with an unusable body."""
 
 
-def fetch_latest_regime(base_url: str, model_name: str) -> dict:
+def fetch_jyjw_mrd_latest(base_url: str, model_name: str) -> dict:
     """Return the ``LatestPredictionResponse`` JSON for ``model_name``.
 
-    Raises ``MarketRegimeUnavailableError`` on any HTTP, network or decoding
+    Raises ``JyjwMrdUnavailableError`` on any HTTP, network or decoding
     failure, and when the response carries no ``latest`` snapshot.
     """
     url = f"{base_url.rstrip('/')}/v1/models/{model_name}/predictions/latest"
     try:
         payload = get_scrubbed(url, params={}, timeout=_TIMEOUT_SECONDS, secret="").json()
     except (requests.RequestException, ValueError) as exc:
-        raise MarketRegimeUnavailableError(f"Market Regime Detector request failed: {exc}") from exc
+        raise JyjwMrdUnavailableError(f"Market Regime Detector request failed: {exc}") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("latest"), dict):
-        raise MarketRegimeUnavailableError(
+        raise JyjwMrdUnavailableError(
             f"Market Regime Detector returned no latest snapshot for model {model_name!r}"
         )
     return payload

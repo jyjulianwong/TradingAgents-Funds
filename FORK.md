@@ -18,7 +18,8 @@ merge it with `git fetch TradingAgents main && git merge TradingAgents/main`.
   `cli-presets` (env-driven CLI skips), `visualizer`, `reddit-feed-token`, `sentiment-window`,
   `valuation-history` and `earnings-outlook` (the Fundamentals Analyst's valuation tools),
   `debate-order` (Bear opens the research debate, Bull closes it),
-  `macro-regime` (the US All Weather regime the investment debate weighs on fund runs).
+  `jyjw-mrd` (the US All Weather regime the investment debate weighs on fund runs),
+  `jyjw-inaai` (the Investment News Analysis AI report the investment debate reads on fund runs).
   A bare `FORK(funds)` marks a fork edit with no topic, such as the autonomous-agent prompt
   instruction in the analysts.
   Import lines are left unmarked (a comment there makes isort reflow them); the code that
@@ -43,7 +44,8 @@ Fork behaviour is kept in fork-only modules; the upstream files carry only tagge
 | `agents/tools.py` (per-instrument tools) | `agents/fund_tools.py` (symbol-selectable twins) | `ToolNode(tool_node_tools(...))` in `graph/setup.py`; `tools_for_run(...)` and a prompt sentence in the market, news and fundamentals analysts |
 | `agents/tools.py` (new tools) | `agents/fund_valuation_tools.py` (`get_valuation_history`, `get_earnings_outlook`); prompt text in `fund_context.get_valuation_instruction` | `TOOLS += VALUATION_TOOLS` and one `get_valuation_instruction()` call in the fundamentals analyst |
 | `dataflows/date_window.py` | `dataflows/fund_date_window.py` (`withhold_live_estimates`) | none (untouched) |
-| `agents/state.py`, Bull/Bear researchers, Research Manager | `dataflows/vendors/market_regime.py` (Market Regime Detector client), `agents/fund_macro_regime.py` (rendered block, `get_macro_regime_instruction`); fetched in `agents/analysts/fund_analyst.py` for live fund runs only | one `macro_regime_report` state field; one `+ get_macro_regime_instruction(state)` line in each of the three debate prompts |
+| `agents/state.py`, Bull/Bear researchers, Research Manager, `reporting.py` | `dataflows/vendors/jyjw_mrd.py` (Market Regime Detector client), `agents/fund_jyjw_mrd.py` (rendered block, `get_jyjw_mrd_instruction`); fetched in `agents/analysts/fund_analyst.py` for live fund runs only | one `jyjw_mrd_report` state field; one `+ get_jyjw_mrd_instruction(state)` line in each of the three debate prompts; one `_SECTIONS` row saving `1_analysts/jyjw_mrd.md` |
+| `agents/state.py`, Bull/Bear researchers, Research Manager, `reporting.py` | `dataflows/vendors/jyjw_inaai.py` (dated report client), `agents/fund_jyjw_inaai.py` (lookback to the latest report on or before the trade date, rendered block, `get_jyjw_inaai_instruction`); fetched in `agents/analysts/fund_analyst.py` for every fund run | one `jyjw_inaai_report` state field; one `+ get_jyjw_inaai_instruction(state)` line in each of the three debate prompts; one `_SECTIONS` row saving `1_analysts/jyjw_inaai.md` |
 
 ### Keeping the fund tools in step with upstream
 
