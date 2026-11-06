@@ -52,7 +52,7 @@ def _header(ticker: str, final_state: dict, settings: dict | None) -> str:
 _SECTIONS = (
     ("I. Analyst Team Reports", "1_analysts", (
         ("Fund Analyst", "fund.md", ("fund_report",)),
-        ("Investment News Analysis AI", "investment_news.md", ("investment_news_analysis_ai_report",)),  # FORK(funds): investment-news
+        ("Investment News Analysis AI", "jyjw_inaai.md", ("jyjw_inaai_report",)),  # FORK(funds): jyjw-inaai
         ("Market Analyst", "market.md", ("market_report",)),
         ("Sentiment Analyst", "sentiment.md", ("sentiment_report",)),
         ("News Analyst", "news.md", ("news_report",)),

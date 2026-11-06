@@ -7,8 +7,8 @@ from tradingagents.agents.context import (
     get_instrument_context_from_state,
     get_language_instruction,
 )
-from tradingagents.agents.fund_investment_news import get_investment_news_instruction
-from tradingagents.agents.fund_macro_regime import get_macro_regime_instruction
+from tradingagents.agents.fund_jyjw_inaai import get_jyjw_inaai_instruction
+from tradingagents.agents.fund_jyjw_mrd import get_jyjw_mrd_instruction
 from tradingagents.agents.schemas import ResearchPlan, render_research_plan
 from tradingagents.agents.structured import (
     NO_EXTERNAL_TOOLS,
@@ -60,8 +60,8 @@ Write these sections, in this order, starting with the recommendation on its own
 
 {NO_EXTERNAL_TOOLS}"""
             + get_fund_analysis_instruction(ticker, state)
-            + get_macro_regime_instruction(state)  # FORK(funds): macro-regime
-            + get_investment_news_instruction(state)  # FORK(funds): investment-news
+            + get_jyjw_mrd_instruction(state)  # FORK(funds): jyjw-mrd
+            + get_jyjw_inaai_instruction(state)  # FORK(funds): jyjw-inaai
             + get_language_instruction()
         )
 

@@ -2,9 +2,9 @@
 
 The Fund Analyst fetches the latest daily news report published on or before
 the run's trade date and stores the rendered block on
-``state["investment_news_analysis_ai_report"]``. Only the investment debate
+``state["jyjw_inaai_report"]``. Only the investment debate
 (Bull, Bear and the Research Manager) reads it, through
-``get_investment_news_instruction``; the analysts never see it, since they
+``get_jyjw_inaai_instruction``; the analysts never see it, since they
 gather their own data.
 
 Reports are dated, so a historical run reads the report of its own date (or
@@ -18,10 +18,10 @@ from collections.abc import Mapping
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from tradingagents.dataflows.vendors.investment_news import (
-    InvestmentNewsUnavailableError,
-    fetch_news_report,
-    report_url,
+from tradingagents.dataflows.vendors.jyjw_inaai import (
+    JyjwInaaiUnavailableError,
+    fetch_jyjw_inaai_report,
+    jyjw_inaai_url_for,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,23 +38,23 @@ def _candidate_dates(trade_date: str, lookback_days: int) -> list[str]:
     return [d.isoformat() for d in days if d.weekday() < 5]
 
 
-def find_latest_report(
+def find_latest_jyjw_inaai_report(
     base_url: str, trade_date: str, lookback_days: int
 ) -> tuple[str, str] | None:
     """Return ``(report_date, markdown)`` for the newest report on or before ``trade_date``.
 
     Looks back ``lookback_days`` calendar days to cover weekends, holidays,
     and a report not yet published today. None when none of them has one;
-    ``InvestmentNewsUnavailableError`` propagates when the site cannot answer.
+    ``JyjwInaaiUnavailableError`` propagates when the site cannot answer.
     """
     for report_date in _candidate_dates(trade_date, lookback_days):
-        text = fetch_news_report(base_url, report_date)
+        text = fetch_jyjw_inaai_report(base_url, report_date)
         if text is not None:
             return report_date, text
     return None
 
 
-def render_news_block(report_date: str, trade_date: str, markdown: str) -> str:
+def render_jyjw_inaai_block(report_date: str, trade_date: str, markdown: str) -> str:
     """Wrap a report in the instructions the debate agents read it with."""
     if len(markdown) > _MAX_REPORT_CHARS:
         markdown = markdown[:_MAX_REPORT_CHARS] + "\n\n[... report truncated ...]"
@@ -72,30 +72,30 @@ def render_news_block(report_date: str, trade_date: str, markdown: str) -> str:
             " regions. Treat its claims as secondary to the analyst reports' verified"
             " data, and say explicitly where it strengthens or weakens your argument.",
             "",
-            "<investment_news_report>",
+            "<jyjw_inaai_report>",
             markdown,
-            "</investment_news_report>",
+            "</jyjw_inaai_report>",
         ]
     )
 
 
-def news_unavailable_note(reason: str) -> str:
+def jyjw_inaai_unavailable_note(reason: str) -> str:
     """One-line note recorded in the Fund Analyst's report when no news report was used."""
     return f"**Investment News Analysis AI report**: unavailable for this run ({reason})."
 
 
-def news_source_note(base_url: str, report_date: str) -> str:
+def jyjw_inaai_source_note(base_url: str, report_date: str) -> str:
     """One-line note naming the report used, for the Fund Analyst's report."""
     return (
         f"**Investment News Analysis AI report**: {report_date}"
-        f" ({report_url(base_url, report_date)}), passed to the investment debate."
+        f" ({jyjw_inaai_url_for(base_url, report_date)}), passed to the investment debate."
     )
 
 
-def fetch_investment_news(
+def fetch_jyjw_inaai(
     base_url: str | None, trade_date: str | None, lookback_days: int
 ) -> tuple[str, str]:
-    """Return ``(investment_news_analysis_ai_report, fund_report_section)`` for this run.
+    """Return ``(jyjw_inaai_report, fund_report_section)`` for this run.
 
     The first is the block the debate agents read; it is empty whenever no
     report was used. The second records what happened, for the saved report.
@@ -103,29 +103,29 @@ def fetch_investment_news(
     if not base_url:
         return "", ""
     if not trade_date:
-        return "", news_unavailable_note("the run has no trade date")
+        return "", jyjw_inaai_unavailable_note("the run has no trade date")
     try:
-        found = find_latest_report(base_url, trade_date, lookback_days)
-    except InvestmentNewsUnavailableError as exc:
-        logger.warning("Fund Analyst: investment news report unavailable: %s", exc)
-        return "", news_unavailable_note(str(exc))
+        found = find_latest_jyjw_inaai_report(base_url, trade_date, lookback_days)
+    except JyjwInaaiUnavailableError as exc:
+        logger.warning("Fund Analyst: jyjw-inaai news report unavailable: %s", exc)
+        return "", jyjw_inaai_unavailable_note(str(exc))
     if found is None:
-        return "", news_unavailable_note(
+        return "", jyjw_inaai_unavailable_note(
             f"no report published in the {lookback_days} days up to {trade_date}"
         )
     report_date, markdown = found
-    return render_news_block(report_date, trade_date, markdown), news_source_note(
+    return render_jyjw_inaai_block(report_date, trade_date, markdown), jyjw_inaai_source_note(
         base_url, report_date
     )
 
 
-def get_investment_news_instruction(state: Mapping[str, Any] | None) -> str:
+def get_jyjw_inaai_instruction(state: Mapping[str, Any] | None) -> str:
     """Return the news report block for a debate prompt, or ``""``.
 
     Empty for non-fund runs and states the Fund Analyst has not populated,
     so it is safe to append unconditionally.
     """
-    report = (state or {}).get("investment_news_analysis_ai_report")
+    report = (state or {}).get("jyjw_inaai_report")
     if not isinstance(report, str) or not report.strip():
         return ""
     return f"\n\n{report}"

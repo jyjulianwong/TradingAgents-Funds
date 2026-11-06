@@ -17,31 +17,31 @@ _TIMEOUT_SECONDS = 15.0
 _NOT_PUBLISHED = (403, 404)
 
 
-class InvestmentNewsUnavailableError(VendorUnavailableError):
+class JyjwInaaiUnavailableError(VendorUnavailableError):
     """The news report site could not answer, or answered with an unusable body."""
 
 
-def report_url(base_url: str, report_date: str) -> str:
+def jyjw_inaai_url_for(base_url: str, report_date: str) -> str:
     return f"{base_url.rstrip('/')}/reports/{report_date}/report.md"
 
 
-def fetch_news_report(base_url: str, report_date: str) -> str | None:
+def fetch_jyjw_inaai_report(base_url: str, report_date: str) -> str | None:
     """Return the markdown report published for ``report_date``, or None if there is none.
 
-    Raises ``InvestmentNewsUnavailableError`` on any other HTTP or network
+    Raises ``JyjwInaaiUnavailableError`` on any other HTTP or network
     failure, and when the body is empty.
     """
-    url = report_url(base_url, report_date)
+    url = jyjw_inaai_url_for(base_url, report_date)
     try:
         response = get_scrubbed(
             url, params={}, timeout=_TIMEOUT_SECONDS, secret="", passthrough=_NOT_PUBLISHED
         )
     except requests.RequestException as exc:
-        raise InvestmentNewsUnavailableError(f"news report request failed: {exc}") from exc
+        raise JyjwInaaiUnavailableError(f"news report request failed: {exc}") from exc
     if response.status_code in _NOT_PUBLISHED:
         return None
     # S3 serves text/markdown with no charset, which requests would read as Latin-1.
     text = response.content.decode("utf-8", errors="replace").strip()
     if not text:
-        raise InvestmentNewsUnavailableError(f"news report for {report_date} is empty")
+        raise JyjwInaaiUnavailableError(f"news report for {report_date} is empty")
     return text

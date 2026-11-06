@@ -13,19 +13,19 @@ import requests
 import tradingagents.dataflows.config as config_module
 import tradingagents.default_config as default_config
 from tradingagents.agents.analysts.fund_analyst import create_fund_analyst
-from tradingagents.agents.fund_macro_regime import (
-    get_macro_regime_instruction,
-    render_regime_block,
+from tradingagents.agents.fund_jyjw_mrd import (
+    get_jyjw_mrd_instruction,
+    render_jyjw_mrd_block,
 )
 from tradingagents.agents.managers.research_manager import create_research_manager
 from tradingagents.agents.researchers.bear_researcher import create_bear_researcher
 from tradingagents.agents.researchers.bull_researcher import create_bull_researcher
 from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.date_window import get_current_date
-from tradingagents.dataflows.vendors import market_regime
-from tradingagents.dataflows.vendors.market_regime import (
-    MarketRegimeUnavailableError,
-    fetch_latest_regime,
+from tradingagents.dataflows.vendors import jyjw_mrd
+from tradingagents.dataflows.vendors.jyjw_mrd import (
+    JyjwMrdUnavailableError,
+    fetch_jyjw_mrd_latest,
 )
 
 ISIN = "IE00B4L5Y983"
@@ -130,7 +130,7 @@ def _run_fund_analyst(trade_date, fetch=None):
     """Run the Fund Analyst on the static-map path, with the regime fetch mocked."""
     set_config({"isin_ticker_map_override": True, "isin_ticker_map": {ISIN: ["IWDA.L"]}})
     fetch = fetch or mock.Mock(return_value=PAYLOAD)
-    with mock.patch(f"{FUND_ANALYST}.fetch_latest_regime", fetch):
+    with mock.patch(f"{FUND_ANALYST}.fetch_jyjw_mrd_latest", fetch):
         result = create_fund_analyst(mock.MagicMock())(_fund_state(trade_date))
     return result, fetch
 
@@ -141,11 +141,13 @@ def _run_fund_analyst(trade_date, fetch=None):
 
 
 @pytest.mark.unit
-class TestFetchLatestRegime:
+class TestFetchJyjwMrdLatest:
     def test_builds_the_latest_url_and_returns_the_payload(self):
         response = mock.Mock(json=mock.Mock(return_value=PAYLOAD))
-        with mock.patch.object(market_regime, "get_scrubbed", return_value=response) as get:
-            assert fetch_latest_regime("https://api.example/", "allweather-hmm2naive-us") == PAYLOAD
+        with mock.patch.object(jyjw_mrd, "get_scrubbed", return_value=response) as get:
+            assert (
+                fetch_jyjw_mrd_latest("https://api.example/", "allweather-hmm2naive-us") == PAYLOAD
+            )
         assert get.call_args.args[0] == (
             "https://api.example/v1/models/allweather-hmm2naive-us/predictions/latest"
         )
@@ -153,25 +155,25 @@ class TestFetchLatestRegime:
     def test_network_error_is_unavailable(self):
         with (
             mock.patch.object(
-                market_regime, "get_scrubbed", side_effect=requests.ConnectionError("down")
+                jyjw_mrd, "get_scrubbed", side_effect=requests.ConnectionError("down")
             ),
-            pytest.raises(MarketRegimeUnavailableError),
+            pytest.raises(JyjwMrdUnavailableError),
         ):
-            fetch_latest_regime("https://api.example", "m")
+            fetch_jyjw_mrd_latest("https://api.example", "m")
 
     def test_missing_latest_snapshot_is_unavailable(self):
         response = mock.Mock(json=mock.Mock(return_value={**PAYLOAD, "latest": None}))
         with (
-            mock.patch.object(market_regime, "get_scrubbed", return_value=response),
-            pytest.raises(MarketRegimeUnavailableError),
+            mock.patch.object(jyjw_mrd, "get_scrubbed", return_value=response),
+            pytest.raises(JyjwMrdUnavailableError),
         ):
-            fetch_latest_regime("https://api.example", "m")
+            fetch_jyjw_mrd_latest("https://api.example", "m")
 
     def test_blocked_network_surfaces_as_unavailable(self):
         # The autouse _no_network fixture refuses the socket; it must come
         # back as the typed error the Fund Analyst catches, not a crash.
-        with pytest.raises(MarketRegimeUnavailableError):
-            fetch_latest_regime("https://api.example", "m")
+        with pytest.raises(JyjwMrdUnavailableError):
+            fetch_jyjw_mrd_latest("https://api.example", "m")
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +184,7 @@ class TestFetchLatestRegime:
 @pytest.mark.unit
 class TestRenderRegimeBlock:
     def test_contents(self):
-        block = render_regime_block(PAYLOAD)
+        block = render_jyjw_mrd_block(PAYLOAD)
         assert "specific to the United States" in block
         assert "`GROWTH_DOWN_INFLATION_UP`" in block
         assert "stagflation" in block
@@ -192,30 +194,30 @@ class TestRenderRegimeBlock:
         assert "`GROWTH_DOWN_INFLATION_UP` ← current" in block
 
     def test_features_are_shown_with_descriptions(self):
-        block = render_regime_block(PAYLOAD)
+        block = render_jyjw_mrd_block(PAYLOAD)
         assert "| cpilfesl_3m_annualized_change |" in block
         assert "core CPI / inflation" in block  # pipe escaped for the table
         assert "| 2026-09-01 |" in block
 
     def test_feature_values_are_formatted_by_kind(self):
-        block = render_regime_block(PAYLOAD)
+        block = render_jyjw_mrd_block(PAYLOAD)
         assert "| +3.41% |" in block  # "% change" fraction -> percentage
         assert "| -1,250 |" in block  # other change -> signed
         assert "| -0.08 |" in block  # float noise trimmed
         assert "| 25.5 |" in block  # level -> plain
 
     def test_raw_data_is_left_out(self):
-        assert "RAW_SERIES_CPIAUCSL" not in render_regime_block(PAYLOAD)
+        assert "RAW_SERIES_CPIAUCSL" not in render_jyjw_mrd_block(PAYLOAD)
 
     def test_stale_is_flagged(self):
-        assert "STALE" in render_regime_block({**PAYLOAD, "is_stale": True})
-        assert "STALE" not in render_regime_block(PAYLOAD)
+        assert "STALE" in render_jyjw_mrd_block({**PAYLOAD, "is_stale": True})
+        assert "STALE" not in render_jyjw_mrd_block(PAYLOAD)
 
     def test_instruction_is_empty_without_a_report(self):
-        assert get_macro_regime_instruction({}) == ""
-        assert get_macro_regime_instruction(None) == ""
-        assert get_macro_regime_instruction({"macro_regime_report": ""}) == ""
-        assert get_macro_regime_instruction({"macro_regime_report": "X"}) == "\n\nX"
+        assert get_jyjw_mrd_instruction({}) == ""
+        assert get_jyjw_mrd_instruction(None) == ""
+        assert get_jyjw_mrd_instruction({"jyjw_mrd_report": ""}) == ""
+        assert get_jyjw_mrd_instruction({"jyjw_mrd_report": "X"}) == "\n\nX"
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +232,7 @@ class TestFundAnalystRegime:
         fetch.assert_called_once_with(
             "https://6nbosjpuc9.execute-api.eu-west-2.amazonaws.com", "allweather-hmm2naive-us"
         )
-        assert "GROWTH_DOWN_INFLATION_UP" in result["macro_regime_report"]
+        assert "GROWTH_DOWN_INFLATION_UP" in result["jyjw_mrd_report"]
         assert "GROWTH_DOWN_INFLATION_UP" in result["fund_report"]
         # The analysts read instrument_context; the regime must stay out of it.
         assert "MACRO REGIME" not in result["instrument_context"]
@@ -238,33 +240,33 @@ class TestFundAnalystRegime:
     def test_historical_run_skips_the_fetch(self):
         result, fetch = _run_fund_analyst("2020-01-02")
         fetch.assert_not_called()
-        assert result["macro_regime_report"] == ""
+        assert result["jyjw_mrd_report"] == ""
         assert "skipped (historical run" in result["fund_report"]
 
     def test_run_without_a_date_skips_the_fetch(self):
         result, fetch = _run_fund_analyst(None)
         fetch.assert_not_called()
-        assert result["macro_regime_report"] == ""
+        assert result["jyjw_mrd_report"] == ""
 
     def test_empty_url_turns_it_off(self):
-        set_config({"market_regime_api_url": ""})
+        set_config({"jyjw_mrd_api_url": ""})
         fetch = mock.Mock(return_value=PAYLOAD)
-        with mock.patch(f"{FUND_ANALYST}.fetch_latest_regime", fetch):
+        with mock.patch(f"{FUND_ANALYST}.fetch_jyjw_mrd_latest", fetch):
             result = create_fund_analyst(mock.MagicMock())(_fund_state(get_current_date()))
         fetch.assert_not_called()
-        assert result["macro_regime_report"] == ""
+        assert result["jyjw_mrd_report"] == ""
         assert "macro regime" not in result["fund_report"].lower()
 
     def test_fetch_failure_keeps_the_run_going(self):
-        fetch = mock.Mock(side_effect=MarketRegimeUnavailableError("timeout"))
+        fetch = mock.Mock(side_effect=JyjwMrdUnavailableError("timeout"))
         result, _ = _run_fund_analyst(get_current_date(), fetch)
         assert result["fund_proxy_tickers"] == ["IWDA.L"]
-        assert result["macro_regime_report"] == ""
+        assert result["jyjw_mrd_report"] == ""
         assert "unavailable for this run (timeout)" in result["fund_report"]
 
     def test_ordinary_ticker_is_still_a_no_op(self):
         fetch = mock.Mock(return_value=PAYLOAD)
-        with mock.patch(f"{FUND_ANALYST}.fetch_latest_regime", fetch):
+        with mock.patch(f"{FUND_ANALYST}.fetch_jyjw_mrd_latest", fetch):
             state = {**_fund_state(get_current_date()), "company_of_interest": "AAPL"}
             assert create_fund_analyst(mock.MagicMock())(state) == {}
         fetch.assert_not_called()
@@ -275,7 +277,7 @@ class TestFundAnalystRegime:
 # ---------------------------------------------------------------------------
 
 
-def _debate_state(macro_regime_report):
+def _debate_state(jyjw_mrd_report):
     return {
         "company_of_interest": ISIN,
         "asset_type": "stock",
@@ -286,7 +288,7 @@ def _debate_state(macro_regime_report):
         "news_report": "n",
         "fundamentals_report": "f",
         "fund_proxy_tickers": ["IWDA.L"],
-        "macro_regime_report": macro_regime_report,
+        "jyjw_mrd_report": jyjw_mrd_report,
         "investment_debate_state": {
             "history": "",
             "bull_history": "",

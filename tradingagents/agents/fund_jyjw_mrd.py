@@ -2,8 +2,8 @@
 
 The Fund Analyst fetches the Market Regime Detector's latest All Weather
 nowcast once per live fund run and stores the rendered block on
-``state["macro_regime_report"]``. Only the investment debate (Bull, Bear and
-the Research Manager) reads it, through ``get_macro_regime_instruction``; the
+``state["jyjw_mrd_report"]``. Only the investment debate (Bull, Bear and
+the Research Manager) reads it, through ``get_jyjw_mrd_instruction``; the
 analysts never see it, so their reports stay about the instrument itself.
 """
 
@@ -70,7 +70,7 @@ def _cell(value: Any) -> str:
     return str(value if value is not None else "n/a").replace("|", "/").replace("\n", " ")
 
 
-def render_regime_block(payload: Mapping[str, Any]) -> str:
+def render_jyjw_mrd_block(payload: Mapping[str, Any]) -> str:
     """Render a ``LatestPredictionResponse`` payload as a compact markdown block.
 
     Shows ``latest.features``, the trend transforms the model actually reads
@@ -140,18 +140,18 @@ def render_regime_block(payload: Mapping[str, Any]) -> str:
     return ensure_blank_line_before_tables("\n".join(lines))
 
 
-def regime_unavailable_note(reason: str) -> str:
+def jyjw_mrd_unavailable_note(reason: str) -> str:
     """One-line block recorded when the regime could not be fetched for a live run."""
     return f"**US MACRO REGIME**: unavailable for this run ({reason})."
 
 
-def get_macro_regime_instruction(state: Mapping[str, Any] | None) -> str:
+def get_jyjw_mrd_instruction(state: Mapping[str, Any] | None) -> str:
     """Return the US macro regime block for a debate prompt, or ``""``.
 
     Empty for non-fund runs, historical runs, and states the Fund Analyst
     has not populated, so it is safe to append unconditionally.
     """
-    report = (state or {}).get("macro_regime_report")
+    report = (state or {}).get("jyjw_mrd_report")
     if not isinstance(report, str) or not report.strip():
         return ""
     return f"\n\n{report}"
