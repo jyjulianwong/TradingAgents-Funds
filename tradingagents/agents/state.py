@@ -63,6 +63,8 @@ class AgentState(MessagesState):
     fund_report: Annotated[str, "Report from the Fund Analyst"]
     # FORK(funds): macro-regime
     macro_regime_report: Annotated[str, "US macro regime block for the investment debate; empty when skipped"]
+    # FORK(funds): investment-news
+    investment_news_analysis_ai_report: Annotated[str, "Investment News Analysis AI report block for the investment debate; empty when unavailable"]
 
     # research step
     market_report: Annotated[str, "Report from the Market Analyst"]

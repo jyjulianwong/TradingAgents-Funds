@@ -40,6 +40,11 @@ Detector's latest US All Weather nowcast (``_fetch_macro_regime``) into
 ``state["macro_regime_report"]``, read only by the investment debate (see
 ``agents/fund_macro_regime.py``). The endpoint only describes today, so a
 historical run, backtests included, skips it rather than leak a later regime.
+
+It also fetches the Investment News Analysis AI report published on or before
+the trade date into ``state["investment_news_analysis_ai_report"]``, likewise
+read only by the investment debate (see ``agents/fund_investment_news.py``).
+Reports are dated, so historical runs read their own date's report.
 """
 
 from __future__ import annotations
@@ -53,6 +58,7 @@ from tradingagents.agents.context import (
     resolve_isin_ticker_list,
 )
 from tradingagents.agents.fund_data_tools import get_fund_fact_sheet
+from tradingagents.agents.fund_investment_news import fetch_investment_news
 from tradingagents.agents.fund_macro_regime import regime_unavailable_note, render_regime_block
 from tradingagents.agents.fund_schemas import FundHoldingsAnalysis
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
@@ -115,6 +121,16 @@ def _fetch_macro_regime(trade_date: str | None) -> tuple[str, str]:
         logger.warning("Fund Analyst: market regime unavailable: %s", exc)
         return "", regime_unavailable_note(str(exc))
     return block, block
+
+
+def _fetch_investment_news(trade_date: str | None) -> tuple[str, str]:
+    """Return ``(investment_news_analysis_ai_report, fund_report_section)`` for this run."""
+    config = get_config()
+    return fetch_investment_news(
+        config.get("investment_news_report_url"),
+        trade_date,
+        int(config.get("investment_news_lookback_days") or 0),
+    )
 
 
 def _match_symbols(table_text: str) -> set[str]:
@@ -230,6 +246,7 @@ def _render_fund_report(
     fact_sheet: str | None,
     verification: dict[str, bool | None] | None = None,
     regime_section: str = "",
+    news_section: str = "",
 ) -> str:
     lines = [
         f"**Instrument**: `{isin}` (fund ISIN)",
@@ -253,6 +270,8 @@ def _render_fund_report(
         lines.extend(["", f"**Rationale**: {rationale}"])
     if regime_section:
         lines.extend(["", regime_section])
+    if news_section:
+        lines.extend(["", news_section])
     if fact_sheet:
         lines.extend(["", "**Fact sheet (mstarpy)**:", fact_sheet])
     return ensure_blank_line_before_tables("\n".join(lines))
@@ -268,6 +287,7 @@ def _finalize(
     verification: dict[str, bool | None],
 ) -> dict:
     macro_regime_report, regime_section = _fetch_macro_regime(state.get("trade_date"))
+    news_report, news_section = _fetch_investment_news(state.get("trade_date"))
     identity = resolve_instrument_identity(ticker)
     instrument_context = build_instrument_context(
         ticker,
@@ -280,8 +300,16 @@ def _finalize(
         "fund_proxy_source": source,
         "instrument_context": instrument_context,
         "macro_regime_report": macro_regime_report,
+        "investment_news_analysis_ai_report": news_report,
         "fund_report": _render_fund_report(
-            ticker, source, proxy_tickers, rationale, fact_sheet, verification, regime_section
+            ticker,
+            source,
+            proxy_tickers,
+            rationale,
+            fact_sheet,
+            verification,
+            regime_section,
+            news_section,
         ),
     }
 

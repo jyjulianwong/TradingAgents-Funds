@@ -5,6 +5,8 @@ See `FORK.md` for how to find fork edits (`grep -rn "FORK(funds)"`).
 
 ## Unreleased: fund runs can fetch proxy-ticker data
 
+- Added the Investment News Analysis AI report to fund runs. The Fund Analyst fetches the latest daily report published on or before the trade date (`{investment_news_report_url}/reports/{YYYY-MM-DD}/report.md`, looking back `investment_news_lookback_days` to cover weekends and a report not yet published today) into `state["investment_news_analysis_ai_report"]`. Only the Bull, Bear and Research Manager prompts read it; the analysts do not. Reports are dated, so historical runs and backtests read their own date's report. Saved as `1_analysts/investment_news.md`. Set `TRADINGAGENTS_INVESTMENT_NEWS_REPORT_URL` to point elsewhere, or an empty `investment_news_report_url` in a config dict to turn it off.
+
 - Fixed: since upstream pinned its data tools to the run's instrument (v0.5.x), a fund run's Market, News and Fundamentals analysts got the ISIN's own data for every proxy request, so no proxy prices, indicators, fundamentals or news were ever used. Added `agents/fund_tools.py`: twins of upstream's tools with an optional `symbol` (the ISIN or its resolved proxies only) that delegate to upstream's own tool functions, so upstream vendor and tool fixes carry through. Ordinary tickers still get upstream's tools and schemas.
 
 - Added `fund_logging.py`: silences yfinance's per-call pandas `inplace` deprecation warnings (hundreds per run). Scoped to yfinance's own modules; set `TRADINGAGENTS_SHOW_LIBRARY_WARNINGS=1` to see them.

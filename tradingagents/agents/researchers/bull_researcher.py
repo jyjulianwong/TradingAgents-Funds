@@ -5,6 +5,7 @@ from tradingagents.agents.context import (
     opponent_argument_or_opening,
     report_or_absent,
 )
+from tradingagents.agents.fund_investment_news import get_investment_news_instruction
 from tradingagents.agents.fund_macro_regime import get_macro_regime_instruction
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 
@@ -57,6 +58,7 @@ Use this information to deliver a compelling bull argument, refute the bear's co
 """
             + get_fund_analysis_instruction(ticker, state)
             + get_macro_regime_instruction(state)  # FORK(funds): macro-regime
+            + get_investment_news_instruction(state)  # FORK(funds): investment-news
             + get_language_instruction()
         )
 
