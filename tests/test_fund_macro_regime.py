@@ -52,7 +52,7 @@ PAYLOAD = {
         "confidence": 0.49,
         "data": [
             {
-                "name": "CPIAUCSL",
+                "name": "RAW_SERIES_CPIAUCSL",
                 "description": "CPI | all urban consumers",
                 "value": 321.456,
                 "realtime_start": "2026-10-15",
@@ -70,13 +70,37 @@ PAYLOAD = {
         ],
         "features": [
             {
-                "name": "SECRET_FEATURE_Z",
-                "description": "scaled feature",
-                "value": 1.2,
-                "realtime_start": None,
-                "date": None,
-                "lag_days": None,
-            }
+                "name": "cpilfesl_3m_annualized_change",
+                "description": "3-month annualized % change in core CPI | inflation",
+                "value": 0.034124037788220596,
+                "realtime_start": "2026-10-14",
+                "date": "2026-09-01",
+                "lag_days": 22,
+            },
+            {
+                "name": "icsa_4wk_avg_change",
+                "description": "Change in the 4-week average of initial claims (growth, inverted)",
+                "value": -1250.0,
+                "realtime_start": "2026-10-29",
+                "date": "2026-10-24",
+                "lag_days": 7,
+            },
+            {
+                "name": "t10yie_1m_change",
+                "description": "1-month change in the 10-year breakeven inflation rate (inflation)",
+                "value": -0.08000000000000007,
+                "realtime_start": "2026-11-04",
+                "date": "2026-11-04",
+                "lag_days": 1,
+            },
+            {
+                "name": "empire_state_level",
+                "description": "Empire State Manufacturing Survey, raw level (growth)",
+                "value": 25.5,
+                "realtime_start": "2026-10-15",
+                "date": "2026-10-01",
+                "lag_days": 21,
+            },
         ],
     },
     "warnings": ["CPI series lags by 44 days"],
@@ -164,14 +188,24 @@ class TestRenderRegimeBlock:
         assert "stagflation" in block
         assert "Confidence**: 49%" in block
         assert "GROWTH_UP_INFLATION_UP 23%" in block
-        assert "CPI / all urban consumers" in block  # pipe escaped for the table
-        assert "| 321.5 |" in block
-        assert "| 159,234 |" in block
         assert "CPI series lags by 44 days" in block
         assert "`GROWTH_DOWN_INFLATION_UP` ← current" in block
 
-    def test_features_are_left_out(self):
-        assert "SECRET_FEATURE_Z" not in render_regime_block(PAYLOAD)
+    def test_features_are_shown_with_descriptions(self):
+        block = render_regime_block(PAYLOAD)
+        assert "| cpilfesl_3m_annualized_change |" in block
+        assert "core CPI / inflation" in block  # pipe escaped for the table
+        assert "| 2026-09-01 |" in block
+
+    def test_feature_values_are_formatted_by_kind(self):
+        block = render_regime_block(PAYLOAD)
+        assert "| +3.41% |" in block  # "% change" fraction -> percentage
+        assert "| -1,250 |" in block  # other change -> signed
+        assert "| -0.08 |" in block  # float noise trimmed
+        assert "| 25.5 |" in block  # level -> plain
+
+    def test_raw_data_is_left_out(self):
+        assert "RAW_SERIES_CPIAUCSL" not in render_regime_block(PAYLOAD)
 
     def test_stale_is_flagged(self):
         assert "STALE" in render_regime_block({**PAYLOAD, "is_stale": True})

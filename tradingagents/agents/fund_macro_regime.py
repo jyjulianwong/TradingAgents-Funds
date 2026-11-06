@@ -50,10 +50,20 @@ def _pct(value: Any) -> str:
     return f"{value:.0%}" if isinstance(value, int | float) else "n/a"
 
 
-def _number(value: Any) -> str:
+def _feature_value(value: Any, description: str) -> str:
+    """Format a model feature by what its description says it measures.
+
+    "% change" features arrive as fractions (0.0096 is 0.96%), so they are
+    shown as signed percentages; other changes are signed; levels are plain.
+    """
     if not isinstance(value, int | float):
         return "n/a"
-    return f"{value:,.0f}" if abs(value) >= 1000 else f"{value:.4g}"
+    text = description.lower()
+    if "% change" in text:
+        return f"{value:+.2%}"
+    if "change" in text:
+        return f"{value:+,.4g}"
+    return f"{value:,.4g}"
 
 
 def _cell(value: Any) -> str:
@@ -63,8 +73,10 @@ def _cell(value: Any) -> str:
 def render_regime_block(payload: Mapping[str, Any]) -> str:
     """Render a ``LatestPredictionResponse`` payload as a compact markdown block.
 
-    Leaves out ``latest.features`` (the model's transformed inputs); the raw
-    ``latest.data`` series carry the same information in readable units.
+    Shows ``latest.features``, the trend transforms the model actually reads
+    (3-month changes, momentum, spreads), each with its description; the raw
+    ``latest.data`` levels are left out, since a level alone says little about
+    the direction of growth or inflation.
     """
     latest = payload.get("latest") or {}
     regime = str(latest.get("regime", "UNKNOWN"))
@@ -90,22 +102,23 @@ def render_regime_block(payload: Mapping[str, Any]) -> str:
         lines.append("- **Warning**: this nowcast is STALE; weight it accordingly.")
     lines.extend(f"- **Warning**: {_cell(w)}" for w in payload.get("warnings") or [])
 
-    data = latest.get("data") or []
-    if data:
+    features = [row for row in latest.get("features") or [] if isinstance(row, Mapping)]
+    if features:
         lines.extend(
             [
                 "",
-                "Latest US macro data:",
+                "Latest US macro trend features the regime model reads (each description"
+                " says whether it signals growth or inflation):",
                 "",
-                "| Series | Description | Value | Date |",
+                "| Feature | Description | Value | Date |",
                 "| --- | --- | --- | --- |",
             ]
         )
         lines.extend(
             f"| {_cell(row.get('name'))} | {_cell(row.get('description'))}"
-            f" | {_number(row.get('value'))} | {_cell(row.get('date'))} |"
-            for row in data
-            if isinstance(row, Mapping)
+            f" | {_feature_value(row.get('value'), str(row.get('description') or ''))}"
+            f" | {_cell(row.get('date'))} |"
+            for row in features
         )
 
     lines.extend(
