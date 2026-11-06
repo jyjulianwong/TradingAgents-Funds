@@ -34,6 +34,12 @@ map-only version ``TradingAgentsGraph.resolve_instrument_context`` seeds
 before the graph starts), so every downstream node — analysts, researchers,
 debaters, trader, portfolio manager — sees the same, dynamically-resolved
 proxy list without recomputing it.
+
+For a live run (``trade_date`` is today) it also fetches the Market Regime
+Detector's latest US All Weather nowcast (``_fetch_macro_regime``) into
+``state["macro_regime_report"]``, read only by the investment debate (see
+``agents/fund_macro_regime.py``). The endpoint only describes today, so a
+historical run, backtests included, skips it rather than leak a later regime.
 """
 
 from __future__ import annotations
@@ -47,11 +53,17 @@ from tradingagents.agents.context import (
     resolve_isin_ticker_list,
 )
 from tradingagents.agents.fund_data_tools import get_fund_fact_sheet
+from tradingagents.agents.fund_macro_regime import regime_unavailable_note, render_regime_block
 from tradingagents.agents.fund_schemas import FundHoldingsAnalysis
 from tradingagents.agents.markdown import ensure_blank_line_before_tables
 from tradingagents.agents.structured import NO_EXTERNAL_TOOLS, bind_structured
 from tradingagents.agents.symbol_search_tools import search_ticker_symbol
 from tradingagents.dataflows.config import get_config
+from tradingagents.dataflows.date_window import is_historical
+from tradingagents.dataflows.vendors.market_regime import (
+    MarketRegimeUnavailableError,
+    fetch_latest_regime,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +87,34 @@ def _fetch_fact_sheet(isin: str) -> str | None:
         logger.info("Fund Analyst: no fact-sheet data for %r: %s", isin, text)
         return None
     return text
+
+
+def _fetch_macro_regime(trade_date: str | None) -> tuple[str, str]:
+    """Return ``(macro_regime_report, fund_report_section)`` for this run.
+
+    ``macro_regime_report`` is the block the debate agents read; it is empty
+    whenever the regime is skipped or unavailable, so they see nothing rather
+    than a stale or missing regime. ``fund_report_section`` records what
+    happened either way, for the saved report.
+    """
+    config = get_config()
+    base_url = config.get("market_regime_api_url")
+    model_name = config.get("market_regime_model_name")
+    if not base_url or not model_name:
+        return "", ""
+    # /latest only ever describes today: a run without a date, or dated
+    # before today, would be handed a regime from after its own date.
+    if not trade_date or is_historical(trade_date):
+        return (
+            "",
+            "**US macro regime**: skipped (historical run; the nowcast only describes today).",
+        )
+    try:
+        block = render_regime_block(fetch_latest_regime(base_url, model_name))
+    except MarketRegimeUnavailableError as exc:
+        logger.warning("Fund Analyst: market regime unavailable: %s", exc)
+        return "", regime_unavailable_note(str(exc))
+    return block, block
 
 
 def _match_symbols(table_text: str) -> set[str]:
@@ -189,6 +229,7 @@ def _render_fund_report(
     rationale: str,
     fact_sheet: str | None,
     verification: dict[str, bool | None] | None = None,
+    regime_section: str = "",
 ) -> str:
     lines = [
         f"**Instrument**: `{isin}` (fund ISIN)",
@@ -196,6 +237,7 @@ def _render_fund_report(
         f"**Proxy tickers**: {', '.join(proxy_tickers) if proxy_tickers else 'none found'}",
     ]
     if verification:
+
         def _mark(ticker: str, verified: bool | None) -> str:
             if verified is True:
                 return f"{ticker} (verified — Alpha Vantage)"
@@ -209,6 +251,8 @@ def _render_fund_report(
         )
     if rationale:
         lines.extend(["", f"**Rationale**: {rationale}"])
+    if regime_section:
+        lines.extend(["", regime_section])
     if fact_sheet:
         lines.extend(["", "**Fact sheet (mstarpy)**:", fact_sheet])
     return ensure_blank_line_before_tables("\n".join(lines))
@@ -223,6 +267,7 @@ def _finalize(
     fact_sheet: str | None,
     verification: dict[str, bool | None],
 ) -> dict:
+    macro_regime_report, regime_section = _fetch_macro_regime(state.get("trade_date"))
     identity = resolve_instrument_identity(ticker)
     instrument_context = build_instrument_context(
         ticker,
@@ -234,8 +279,9 @@ def _finalize(
         "fund_proxy_tickers": proxy_tickers,
         "fund_proxy_source": source,
         "instrument_context": instrument_context,
+        "macro_regime_report": macro_regime_report,
         "fund_report": _render_fund_report(
-            ticker, source, proxy_tickers, rationale, fact_sheet, verification
+            ticker, source, proxy_tickers, rationale, fact_sheet, verification, regime_section
         ),
     }
 
@@ -273,9 +319,7 @@ def create_fund_analyst(llm):
                     proxy_tickers = result.proxy_tickers
                     rationale = result.rationale
             except Exception as exc:  # noqa: BLE001 — fall through to static fallback
-                logger.warning(
-                    "Fund Analyst: structured synthesis failed for %r: %s", ticker, exc
-                )
+                logger.warning("Fund Analyst: structured synthesis failed for %r: %s", ticker, exc)
 
         # Verify the LLM's own picks against a live symbol database before
         # trusting them — its "genuinely confident" claim in the prompt is a
@@ -289,8 +333,9 @@ def create_fund_analyst(llm):
             unverifiable = [t for t in proxy_tickers if verification.get(t) is False]
             if unverifiable:
                 logger.info(
-                    "Fund Analyst: dropping proxy tickers not found on Alpha "
-                    "Vantage for %r: %s", ticker, unverifiable,
+                    "Fund Analyst: dropping proxy tickers not found on Alpha Vantage for %r: %s",
+                    ticker,
+                    unverifiable,
                 )
                 proxy_tickers = [t for t in proxy_tickers if t not in unverifiable]
 
