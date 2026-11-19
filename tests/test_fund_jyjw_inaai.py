@@ -33,7 +33,7 @@ from tradingagents.dataflows.vendors.jyjw_inaai import (
 from tradingagents.reporting import write_report_tree
 
 ISIN = "IE00B4L5Y983"
-URL = "https://004246189700-jyjulianwong-ina-news-reports.s3.eu-west-2.amazonaws.com"
+URL = "https://997614126651-jyjulianwong-ina-news-reports.s3.eu-west-2.amazonaws.com"
 REPORT = "# Investment News Analysis AI — 2026-11-05\n\n## 1. Executive Summary\n\n- Oil fell."
 
 

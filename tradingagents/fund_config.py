@@ -56,14 +56,14 @@ FUND_DEFAULTS = {
     # Bear, Research Manager) to weigh. Historical runs and backtests skip it.
     # An empty URL turns it off (the env override cannot set an empty value,
     # so set the key in a config dict to disable it programmatically).
-    "jyjw_mrd_api_url": "https://6nbosjpuc9.execute-api.eu-west-2.amazonaws.com",
+    "jyjw_mrd_api_url": "https://0ltgfa46i0.execute-api.eu-west-2.amazonaws.com",
     "jyjw_mrd_model_name": "allweather-hmm2naive-us",
     # Investment News Analysis AI: a daily (weekday) markdown news digest at
     # {url}/reports/{YYYY-MM-DD}/report.md. The Fund Analyst fetches the latest
     # one published on or before the trade date, looking back this many
     # calendar days, for the investment debate (Bull, Bear, Research Manager).
     # An empty URL turns it off.
-    "jyjw_inaai_report_url": "https://004246189700-jyjulianwong-ina-news-reports.s3.eu-west-2.amazonaws.com",
+    "jyjw_inaai_report_url": "https://997614126651-jyjulianwong-ina-news-reports.s3.eu-west-2.amazonaws.com",
     "jyjw_inaai_lookback_days": 5,
     # ISIN-to-ticker mapping — static BACKUP only (unless the override above
     # is set, in which case it's the only source used).
