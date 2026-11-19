@@ -231,7 +231,7 @@ class TestFundAnalystRegime:
     def test_live_fund_run_fetches_the_configured_model(self):
         result, fetch = _run_fund_analyst(get_current_date())
         fetch.assert_called_once_with(
-            "https://6nbosjpuc9.execute-api.eu-west-2.amazonaws.com", "allweather-hmm2naive-us"
+            "https://0ltgfa46i0.execute-api.eu-west-2.amazonaws.com", "allweather-hmm2naive-us"
         )
         assert "GROWTH_DOWN_INFLATION_UP" in result["jyjw_mrd_report"]
         # The fund report records only the headline; the full block is saved on its own.
